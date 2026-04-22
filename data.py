@@ -5,10 +5,11 @@ HK_ATTRACTIONS = [
     {
         "name": "Victoria Peak",
         "district": "The Peak / Central",
+        "lat": 22.2759, "lng": 114.1455,
         "tags": ["scenic_views", "photography", "culture"],
-        "cost_tier": "medium",    # Peak Tram ~HKD 118 return
+        "cost_tier": "medium",
         "duration_hours": 2.5,
-        "mobility_friendly": False,  # steep tram, some walking
+        "mobility_friendly": False,
         "crowd_level": "high",
         "description": "Iconic hilltop with panoramic city views; take the historic Peak Tram.",
         "opening": "Peak Tram 07:00-23:00 daily",
@@ -16,6 +17,7 @@ HK_ATTRACTIONS = [
     {
         "name": "PMQ",
         "district": "Central",
+        "lat": 22.2817, "lng": 114.1536,
         "tags": ["culture", "photography", "social_trendy", "shopping"],
         "cost_tier": "low",
         "duration_hours": 1.5,
@@ -27,6 +29,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Tai Kwun",
         "district": "Central",
+        "lat": 22.2808, "lng": 114.1551,
         "tags": ["culture", "history", "photography", "social_trendy"],
         "cost_tier": "low",
         "duration_hours": 2.0,
@@ -38,8 +41,9 @@ HK_ATTRACTIONS = [
     {
         "name": "Hong Kong Palace Museum",
         "district": "West Kowloon",
+        "lat": 22.3033, "lng": 114.1578,
         "tags": ["culture", "history"],
-        "cost_tier": "medium",   # ~HKD 50-120
+        "cost_tier": "medium",
         "duration_hours": 3.0,
         "mobility_friendly": True,
         "crowd_level": "medium",
@@ -49,6 +53,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Stanley Market & Promenade",
         "district": "Stanley",
+        "lat": 22.2185, "lng": 114.2121,
         "tags": ["shopping", "scenic_views", "local_food", "relaxation"],
         "cost_tier": "low",
         "duration_hours": 2.0,
@@ -60,6 +65,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Repulse Bay Beach",
         "district": "Repulse Bay",
+        "lat": 22.2366, "lng": 114.1964,
         "tags": ["scenic_views", "relaxation", "photography"],
         "cost_tier": "low",
         "duration_hours": 2.0,
@@ -71,6 +77,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Nan Lian Garden",
         "district": "Diamond Hill",
+        "lat": 22.3348, "lng": 114.2011,
         "tags": ["culture", "scenic_views", "relaxation", "photography"],
         "cost_tier": "low",
         "duration_hours": 1.5,
@@ -82,6 +89,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Kennedy Town Promenade",
         "district": "Kennedy Town",
+        "lat": 22.2796, "lng": 114.1280,
         "tags": ["local_food", "social_trendy", "scenic_views", "hidden_gems"],
         "cost_tier": "low",
         "duration_hours": 1.5,
@@ -95,6 +103,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Tsim Sha Tsui Promenade (Avenue of Stars)",
         "district": "Tsim Sha Tsui",
+        "lat": 22.2936, "lng": 114.1719,
         "tags": ["scenic_views", "photography", "relaxation"],
         "cost_tier": "low",
         "duration_hours": 1.5,
@@ -106,6 +115,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Mong Kok Street Markets (Ladies Market / Flower Market)",
         "district": "Mong Kok",
+        "lat": 22.3193, "lng": 114.1694,
         "tags": ["shopping", "local_food", "hidden_gems", "social_trendy"],
         "cost_tier": "low",
         "duration_hours": 2.0,
@@ -117,6 +127,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Yau Ma Tei Temple Street Night Market",
         "district": "Yau Ma Tei",
+        "lat": 22.3104, "lng": 114.1712,
         "tags": ["local_food", "culture", "hidden_gems", "social_trendy"],
         "cost_tier": "low",
         "duration_hours": 2.0,
@@ -128,6 +139,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Kowloon Walled City Park",
         "district": "Kowloon City",
+        "lat": 22.3325, "lng": 114.1884,
         "tags": ["history", "culture", "hidden_gems", "relaxation"],
         "cost_tier": "low",
         "duration_hours": 1.5,
@@ -139,6 +151,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Sham Shui Po Electronics & Fabric Markets",
         "district": "Sham Shui Po",
+        "lat": 22.3299, "lng": 114.1628,
         "tags": ["shopping", "hidden_gems", "local_food"],
         "cost_tier": "low",
         "duration_hours": 2.0,
@@ -152,10 +165,11 @@ HK_ATTRACTIONS = [
     {
         "name": "Tian Tan Buddha (Big Buddha) & Po Lin Monastery",
         "district": "Lantau Island",
+        "lat": 22.2537, "lng": 113.9055,
         "tags": ["culture", "history", "scenic_views", "photography"],
-        "cost_tier": "medium",   # Ngong Ping 360 cable car ~HKD 235 return
+        "cost_tier": "medium",
         "duration_hours": 4.0,
-        "mobility_friendly": False,  # 268 steps to Buddha
+        "mobility_friendly": False,
         "crowd_level": "high",
         "description": "World's largest outdoor seated bronze Buddha atop Lantau; stunning mountain scenery.",
         "opening": "Cable car 10:00-17:30; Buddha 10:00-17:00",
@@ -163,6 +177,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Tai O Fishing Village",
         "district": "Lantau Island",
+        "lat": 22.2541, "lng": 113.8649,
         "tags": ["culture", "hidden_gems", "local_food", "photography"],
         "cost_tier": "low",
         "duration_hours": 2.5,
@@ -174,6 +189,7 @@ HK_ATTRACTIONS = [
     {
         "name": "Sai Kung Waterfront & Seafood",
         "district": "Sai Kung",
+        "lat": 22.3814, "lng": 114.2706,
         "tags": ["local_food", "scenic_views", "relaxation", "hidden_gems"],
         "cost_tier": "medium",
         "duration_hours": 3.0,
@@ -346,3 +362,140 @@ CONSTRAINT_TAGS = [
     "avoid_outdoor_heavy",
     "avoid_expensive",
 ]
+
+# Hong Kong monthly climate data (based on HK Observatory averages)
+# Each month has base stats and 3 daily_variations cycled across trip days.
+HK_WEATHER_BY_MONTH = {
+    1: {
+        "name": "January", "season": "Winter",
+        "temp_high_c": 18, "temp_low_c": 13, "humidity_pct": 72,
+        "rain_probability_pct": 15, "uv_index": 4,
+        "general_advisory": "Cool and dry — ideal sightseeing conditions. Light jacket for mornings and evenings.",
+        "daily_variations": [
+            {"condition": "Sunny",         "temp_delta": 1,  "rain_delta": -5},
+            {"condition": "Partly Cloudy", "temp_delta": 0,  "rain_delta": 0},
+            {"condition": "Sunny",         "temp_delta": 1,  "rain_delta": -5},
+        ],
+    },
+    2: {
+        "name": "February", "season": "Winter",
+        "temp_high_c": 18, "temp_low_c": 14, "humidity_pct": 80,
+        "rain_probability_pct": 30, "uv_index": 4,
+        "general_advisory": "Misty and humid — visibility may be low at times. Bring an extra layer.",
+        "daily_variations": [
+            {"condition": "Partly Cloudy", "temp_delta": 0,  "rain_delta": 0},
+            {"condition": "Overcast",      "temp_delta": -1, "rain_delta": 10},
+            {"condition": "Misty",         "temp_delta": 0,  "rain_delta": 5},
+        ],
+    },
+    3: {
+        "name": "March", "season": "Spring",
+        "temp_high_c": 21, "temp_low_c": 17, "humidity_pct": 82,
+        "rain_probability_pct": 40, "uv_index": 6,
+        "general_advisory": "Mild but unpredictable — light rain gear recommended. Transitional weather.",
+        "daily_variations": [
+            {"condition": "Cloudy",        "temp_delta": 0,  "rain_delta": 0},
+            {"condition": "Light Rain",    "temp_delta": -1, "rain_delta": 20},
+            {"condition": "Partly Cloudy", "temp_delta": 1,  "rain_delta": -10},
+        ],
+    },
+    4: {
+        "name": "April", "season": "Spring",
+        "temp_high_c": 25, "temp_low_c": 21, "humidity_pct": 84,
+        "rain_probability_pct": 55, "uv_index": 7,
+        "general_advisory": "Rainy season begins — umbrella essential. Warm and humid.",
+        "daily_variations": [
+            {"condition": "Cloudy with Showers", "temp_delta": -1, "rain_delta": 15},
+            {"condition": "Partly Cloudy",        "temp_delta": 1,  "rain_delta": -10},
+            {"condition": "Light Rain",            "temp_delta": 0,  "rain_delta": 10},
+        ],
+    },
+    5: {
+        "name": "May", "season": "Rainy Season",
+        "temp_high_c": 29, "temp_low_c": 25, "humidity_pct": 84,
+        "rain_probability_pct": 70, "uv_index": 9,
+        "general_advisory": "Heavy rain season — waterproof shoes and umbrella essential. Very hot and humid.",
+        "daily_variations": [
+            {"condition": "Heavy Showers",      "temp_delta": -1, "rain_delta": 20},
+            {"condition": "Partly Cloudy",       "temp_delta": 1,  "rain_delta": -15},
+            {"condition": "Overcast with Rain",  "temp_delta": 0,  "rain_delta": 10},
+        ],
+    },
+    6: {
+        "name": "June", "season": "Monsoon",
+        "temp_high_c": 31, "temp_low_c": 27, "humidity_pct": 83,
+        "rain_probability_pct": 75, "uv_index": 10,
+        "general_advisory": "Typhoon season begins — monitor HK Observatory warnings. Very hot with heavy rain.",
+        "daily_variations": [
+            {"condition": "Heavy Rain",    "temp_delta": -1, "rain_delta": 15},
+            {"condition": "Thunderstorms", "temp_delta": -2, "rain_delta": 20},
+            {"condition": "Partly Cloudy", "temp_delta": 1,  "rain_delta": -20},
+        ],
+    },
+    7: {
+        "name": "July", "season": "Summer",
+        "temp_high_c": 32, "temp_low_c": 28, "humidity_pct": 83,
+        "rain_probability_pct": 65, "uv_index": 11,
+        "general_advisory": "Hottest month — typhoon risk and intense heat. Stay hydrated and check HK Observatory alerts daily.",
+        "daily_variations": [
+            {"condition": "Sunny & Hot",   "temp_delta": 1,  "rain_delta": -10},
+            {"condition": "Thunderstorms", "temp_delta": -1, "rain_delta": 20},
+            {"condition": "Cloudy & Hot",  "temp_delta": 0,  "rain_delta": 5},
+        ],
+    },
+    8: {
+        "name": "August", "season": "Summer",
+        "temp_high_c": 32, "temp_low_c": 28, "humidity_pct": 83,
+        "rain_probability_pct": 65, "uv_index": 11,
+        "general_advisory": "Hot, humid, and typhoon risk — check HK Observatory alerts daily.",
+        "daily_variations": [
+            {"condition": "Hot & Humid",   "temp_delta": 0,  "rain_delta": 0},
+            {"condition": "Thunderstorms", "temp_delta": -1, "rain_delta": 20},
+            {"condition": "Partly Cloudy", "temp_delta": 1,  "rain_delta": -15},
+        ],
+    },
+    9: {
+        "name": "September", "season": "Late Summer",
+        "temp_high_c": 30, "temp_low_c": 26, "humidity_pct": 81,
+        "rain_probability_pct": 55, "uv_index": 9,
+        "general_advisory": "Still warm — typhoon season continues. Conditions improve gradually toward month-end.",
+        "daily_variations": [
+            {"condition": "Partly Cloudy",      "temp_delta": 0,  "rain_delta": 0},
+            {"condition": "Occasional Showers", "temp_delta": -1, "rain_delta": 15},
+            {"condition": "Hot & Sunny",         "temp_delta": 1,  "rain_delta": -15},
+        ],
+    },
+    10: {
+        "name": "October", "season": "Autumn",
+        "temp_high_c": 27, "temp_low_c": 23, "humidity_pct": 73,
+        "rain_probability_pct": 25, "uv_index": 7,
+        "general_advisory": "Best time to visit — clear skies, comfortable temperatures, and low humidity.",
+        "daily_variations": [
+            {"condition": "Sunny",          "temp_delta": 1,  "rain_delta": -5},
+            {"condition": "Partly Cloudy",  "temp_delta": 0,  "rain_delta": 0},
+            {"condition": "Clear & Breezy", "temp_delta": -1, "rain_delta": -5},
+        ],
+    },
+    11: {
+        "name": "November", "season": "Autumn",
+        "temp_high_c": 23, "temp_low_c": 18, "humidity_pct": 68,
+        "rain_probability_pct": 15, "uv_index": 5,
+        "general_advisory": "Pleasant and dry — excellent for outdoor activities. Light jacket for evenings.",
+        "daily_variations": [
+            {"condition": "Sunny",        "temp_delta": 1,  "rain_delta": -5},
+            {"condition": "Partly Cloudy","temp_delta": 0,  "rain_delta": 0},
+            {"condition": "Cool & Clear", "temp_delta": -1, "rain_delta": 0},
+        ],
+    },
+    12: {
+        "name": "December", "season": "Winter",
+        "temp_high_c": 19, "temp_low_c": 14, "humidity_pct": 67,
+        "rain_probability_pct": 10, "uv_index": 3,
+        "general_advisory": "Cool and clear — layered clothing recommended. Great for outdoor exploration.",
+        "daily_variations": [
+            {"condition": "Clear & Cool",  "temp_delta": 0,  "rain_delta": 0},
+            {"condition": "Sunny",         "temp_delta": 1,  "rain_delta": -5},
+            {"condition": "Partly Cloudy", "temp_delta": -1, "rain_delta": 5},
+        ],
+    },
+}

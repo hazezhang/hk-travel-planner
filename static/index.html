@@ -3,490 +3,1649 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>HK AI Travel Planner</title>
+<title>HK Trip Curator</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: #f5f5fa; color: #222; min-height: 100vh;
-  }
-  .shell {
-    display: grid; grid-template-columns: 260px 1fr; min-height: 100vh;
-  }
+/* ── Design Tokens ───────────────────────────────────────────────── */
+:root {
+  --v:        #7c3aed;   /* violet primary */
+  --v-deep:   #5b21b6;
+  --v-mid:    #8b5cf6;
+  --v-light:  #ede9fe;
+  --v-pale:   #f5f3ff;
+  --sky:      #0ea5e9;
+  --sky-pale: #e0f2fe;
+  --amber:    #f59e0b;
+  --amber-pale: #fffbeb;
+  --green:    #10b981;
+  --text:     #1e1b4b;
+  --text-2:   #6b7280;
+  --border:   #e5e7eb;
+  --bg:       #f8f7ff;
+  --surface:  #fff;
+}
 
-  /* ── Sidebar ─────────────────────────────── */
-  .sidebar {
-    background: linear-gradient(160deg, #5b4fcf 0%, #3b3491 100%);
-    color: #fff; padding: 44px 28px;
-    display: flex; flex-direction: column; gap: 36px;
-  }
-  .sidebar-logo { font-size: 2rem; }
-  .sidebar h1 { font-size: 1.4rem; font-weight: 700; line-height: 1.35; }
-  .sidebar p  { font-size: .82rem; opacity: .72; line-height: 1.65; margin-top: 8px; }
-  .steps { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
-  .step-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 12px; border-radius: 10px;
-    font-size: .82rem; opacity: .5; transition: all .2s;
-  }
-  .step-item.active { opacity: 1; background: rgba(255,255,255,.15); }
-  .step-item.done   { opacity: .75; }
-  .step-dot {
-    width: 26px; height: 26px; border-radius: 50%;
-    background: rgba(255,255,255,.2);
-    display: flex; align-items: center; justify-content: center;
-    font-size: .72rem; font-weight: 700; flex-shrink: 0;
-  }
-  .step-item.active .step-dot { background: #fff; color: #5b4fcf; }
-  .step-item.done   .step-dot { background: #a5f3c4; color: #065f46; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* ── Main ────────────────────────────────── */
-  .main { padding: 44px; display: flex; align-items: flex-start; justify-content: center; }
-  .card {
-    background: #fff; border-radius: 20px; padding: 38px;
-    width: 100%; max-width: 600px;
-    box-shadow: 0 4px 24px rgba(0,0,0,.07);
-  }
-  .card h2 { font-size: 1.35rem; font-weight: 700; margin-bottom: 5px; }
-  .card .sub { color: #666; font-size: .86rem; margin-bottom: 26px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
 
-  /* ── Fields ──────────────────────────────── */
-  .field { margin-bottom: 18px; }
-  .field label { display: block; font-size: .8rem; font-weight: 600; color: #444; margin-bottom: 6px; }
-  input[type=number], select {
-    width: 100%; padding: 9px 13px;
-    border: 1.5px solid #e0e0e0; border-radius: 10px;
-    font-size: .88rem; outline: none; transition: border .2s;
-    background: #fff;
-  }
-  input[type=number]:focus, select:focus { border-color: #5b4fcf; }
-  .row { display: flex; gap: 14px; }
-  .row .field { flex: 1; }
+/* ── Shell ───────────────────────────────────────────────────────── */
+.shell {
+  display: grid;
+  grid-template-columns: 270px 1fr;
+  min-height: 100vh;
+}
 
-  /* extra traveller ages */
-  .age-list { display: flex; flex-wrap: wrap; gap: 8px; }
-  .age-chip {
-    display: flex; align-items: center; gap: 6px;
-    background: #f3f0ff; border-radius: 8px; padding: 5px 10px;
-    font-size: .8rem; color: #5b4fcf;
-  }
-  .age-chip input { width: 56px; padding: 3px 7px; font-size: .8rem; }
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+.sidebar {
+  background: linear-gradient(170deg, #0d0b1f 0%, #1e1b4b 55%, #0f2a47 100%);
+  color: #fff;
+  padding: 40px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  position: relative;
+  overflow: hidden;
+}
+/* dot-grid pattern */
+.sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(139,92,246,.18) 1px, transparent 1px);
+  background-size: 26px 26px;
+  pointer-events: none;
+}
+/* neon glow blob */
+.sidebar::after {
+  content: '';
+  position: absolute;
+  width: 220px; height: 220px;
+  background: radial-gradient(circle, rgba(124,58,237,.25) 0%, transparent 70%);
+  bottom: 80px; right: -60px;
+  pointer-events: none;
+}
 
-  /* ── Checkbox cards ──────────────────────── */
-  .check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-  .check-grid.col3 { grid-template-columns: 1fr 1fr 1fr; }
+.brand { position: relative; z-index: 1; }
+.brand-hk {
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: -.04em;
+  line-height: 1;
+  background: linear-gradient(135deg, #a78bfa 0%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.brand-name {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+  color: rgba(255,255,255,.4);
+  margin-top: 2px;
+}
+.brand-tagline {
+  font-size: .84rem;
+  color: rgba(255,255,255,.62);
+  line-height: 1.65;
+  margin-top: 12px;
+}
 
-  /* hide the real checkbox but keep it functional */
-  .check-card {
-    border: 1.5px solid #e5e5e5; border-radius: 12px;
-    padding: 11px 13px; cursor: pointer;
-    display: flex; align-items: center; gap: 9px;
-    font-size: .83rem; user-select: none;
-    transition: border-color .15s, background .15s;
-  }
-  .check-card input[type=checkbox] {
-    position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0;
-  }
-  .check-card .icon { font-size: 1.15rem; flex-shrink: 0; }
-  .check-card:hover { border-color: #c4b8ff; }
-  .check-card.picked { border-color: #5b4fcf; background: #f3f0ff; color: #3b3491; font-weight: 600; }
+/* live trip snapshot */
+.snapshot {
+  position: relative;
+  z-index: 1;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: .79rem;
+  display: none;
+}
+.snapshot.visible { display: block; }
+.snap-label {
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: rgba(255,255,255,.35);
+  margin-bottom: 10px;
+}
+.snap-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  color: rgba(255,255,255,.65);
+}
+.snap-row:last-child { border-bottom: none; }
+.snap-val { color: #a78bfa; font-weight: 700; font-size: .82rem; }
 
-  /* pace buttons (radio-style, no hidden checkbox) */
-  .pace-btn {
-    border: 1.5px solid #e5e5e5; border-radius: 12px;
-    padding: 11px 13px; cursor: pointer;
-    display: flex; align-items: center; gap: 9px;
-    font-size: .83rem; user-select: none;
-    transition: border-color .15s, background .15s;
-  }
-  .pace-btn:hover { border-color: #c4b8ff; }
-  .pace-btn.picked { border-color: #5b4fcf; background: #f3f0ff; color: #3b3491; font-weight: 600; }
+/* step progress */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: auto;
+  position: relative;
+  z-index: 1;
+}
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  position: relative;
+}
+.step-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 13px; top: 34px;
+  width: 2px;
+  height: calc(100% - 14px);
+  background: rgba(255,255,255,.08);
+}
+.step-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.08);
+  border: 2px solid rgba(255,255,255,.12);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .7rem; font-weight: 800;
+  flex-shrink: 0;
+  transition: all .3s;
+}
+.step-lbl {
+  font-size: .81rem;
+  color: rgba(255,255,255,.38);
+  transition: color .3s;
+}
+.step-item.active .step-dot {
+  background: var(--v-mid);
+  border-color: var(--v-mid);
+  box-shadow: 0 0 14px rgba(139,92,246,.55);
+}
+.step-item.active .step-lbl { color: #fff; font-weight: 600; }
+.step-item.done .step-dot { background: var(--green); border-color: var(--green); }
+.step-item.done .step-lbl { color: rgba(255,255,255,.5); }
 
-  /* section label inside constraints */
-  .section-label {
-    font-size: .75rem; color: #999; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .06em;
-    margin: 14px 0 7px;
-  }
+/* ── Main ────────────────────────────────────────────────────────── */
+.main {
+  padding: 44px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
 
-  /* ── Buttons ─────────────────────────────── */
-  .btn-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 26px; }
-  .btn {
-    padding: 10px 26px; border-radius: 10px; font-size: .88rem;
-    font-weight: 600; cursor: pointer; border: none; transition: opacity .15s;
-  }
-  .btn:hover { opacity: .86; }
-  .btn-primary { background: #5b4fcf; color: #fff; }
-  .btn-ghost   { background: transparent; border: 1.5px solid #ddd; color: #555; }
+/* ── Step Card ───────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 38px 40px;
+  width: 100%;
+  max-width: 640px;
+  box-shadow: 0 4px 40px rgba(30,27,75,.09);
+}
+.card-eyebrow {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--v);
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.card h2 {
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: -.025em;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+.card .sub {
+  color: var(--text-2);
+  font-size: .85rem;
+  margin-bottom: 28px;
+  line-height: 1.65;
+}
+.section-label {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--text-2);
+  font-weight: 700;
+  margin: 22px 0 10px;
+}
 
-  /* ── Result ──────────────────────────────── */
-  .spinner-wrap {
-    display: flex; flex-direction: column; align-items: center;
-    gap: 14px; padding: 48px 0; color: #5b4fcf; font-size: .9rem;
-  }
-  .spinner {
-    width: 42px; height: 42px; border: 4px solid #e0daff;
-    border-top-color: #5b4fcf; border-radius: 50%;
-    animation: spin .75s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* ── Pill group ──────────────────────────────────────────────────── */
+.pill-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill {
+  padding: 9px 20px;
+  border-radius: 100px;
+  border: 2px solid var(--border);
+  font-size: .84rem; font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  color: var(--text-2);
+  user-select: none;
+  white-space: nowrap;
+}
+.pill:hover { border-color: var(--v-mid); color: var(--v); }
+.pill.active {
+  background: var(--v);
+  border-color: var(--v);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(124,58,237,.28);
+}
 
-  .result-body {
-    font-size: .86rem; line-height: 1.75; color: #333;
-    max-height: 62vh; overflow-y: auto; padding-right: 4px;
-  }
-  .result-body h2  { font-size: 1.15rem; color: #3b3491; margin: 18px 0 5px; }
-  .result-body h3  { font-size: .95rem;  color: #5b4fcf; margin: 14px 0 4px; }
-  .result-body hr  { border: none; border-top: 1px solid #eee; margin: 10px 0; }
-  .result-body table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: .82rem; }
-  .result-body th,
-  .result-body td  { border: 1px solid #e0e0e0; padding: 6px 10px; }
-  .result-body th  { background: #f3f0ff; }
+/* ── Budget cards ────────────────────────────────────────────────── */
+.budget-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.budget-card {
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  padding: 20px 14px;
+  cursor: pointer;
+  text-align: center;
+  transition: all .25s;
+}
+.budget-card:hover {
+  border-color: var(--v-mid);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124,58,237,.1);
+}
+.budget-card.active {
+  border-color: var(--v);
+  background: linear-gradient(145deg, var(--v-pale) 0%, var(--v-light) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124,58,237,.18);
+}
+.budget-icon { font-size: 1.9rem; margin-bottom: 10px; }
+.budget-name { font-weight: 800; font-size: .88rem; }
+.budget-range { font-size: .71rem; color: var(--text-2); margin-top: 4px; line-height: 1.55; }
 
-  .error-box {
-    background: #fff0f0; border: 1.5px solid #f7c0c0; color: #b91c1c;
-    border-radius: 10px; padding: 12px 16px; font-size: .84rem; margin-top: 12px;
-  }
-  .action-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-  .action-btn {
-    font-size: .82rem; font-weight: 600; cursor: pointer; border: none;
-    padding: 8px 18px; border-radius: 8px;
-  }
-  .action-btn.save  { background: #f3f0ff; color: #5b4fcf; }
-  .action-btn.reset { background: #f0f9ff; color: #0369a1; }
-  .action-btn:hover { opacity: .85; }
+/* ── Style cards ─────────────────────────────────────────────────── */
+.style-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.style-card {
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 12px;
+  transition: all .2s;
+  user-select: none;
+}
+.style-card:hover { border-color: var(--v-mid); }
+.style-card.active {
+  border-color: var(--v);
+  background: var(--v-pale);
+}
+.style-emoji { font-size: 1.5rem; flex-shrink: 0; }
+.style-name { font-weight: 700; font-size: .86rem; }
+.style-desc { font-size: .72rem; color: var(--text-2); margin-top: 2px; line-height: 1.4; }
+
+/* ── Group cards ─────────────────────────────────────────────────── */
+.group-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.group-card {
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: all .2s;
+  user-select: none;
+}
+.group-card:hover { border-color: var(--sky); }
+.group-card.active { border-color: var(--sky); background: var(--sky-pale); }
+.gc-icon { font-size: 1.6rem; margin-bottom: 6px; }
+.gc-lbl { font-size: .8rem; font-weight: 700; }
+
+/* ── Constraint chips ────────────────────────────────────────────── */
+.chip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.chip {
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 13px;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  font-size: .82rem; font-weight: 500;
+  transition: all .2s;
+  user-select: none;
+}
+.chip:hover { border-color: var(--amber); }
+.chip.active { border-color: var(--amber); background: var(--amber-pale); color: #92400e; font-weight: 700; }
+.chip-icon { font-size: 1.05rem; flex-shrink: 0; }
+
+/* ── Form fields ─────────────────────────────────────────────────── */
+.field { margin-bottom: 18px; }
+.field label {
+  display: block;
+  font-size: .74rem; font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase; letter-spacing: .07em;
+  margin-bottom: 8px;
+}
+input[type=number], input[type=date] {
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-size: .9rem; outline: none;
+  transition: border .2s;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+}
+input[type=number]:focus, input[type=date]:focus { border-color: var(--v); }
+.free-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-size: .86rem;
+  outline: none;
+  transition: border .2s;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  line-height: 1.55;
+  resize: vertical;
+  min-height: 80px;
+}
+.free-input:focus { border-color: var(--v); }
+.free-hint {
+  margin-top: 6px;
+  font-size: .72rem;
+  color: var(--text-2);
+}
+.row { display: flex; gap: 14px; }
+.row .field { flex: 1; }
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 30px; }
+.btn {
+  padding: 11px 28px;
+  border-radius: 12px;
+  font-size: .88rem; font-weight: 700;
+  cursor: pointer; border: none;
+  transition: all .2s;
+}
+.btn-primary {
+  background: var(--v);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(124,58,237,.3);
+}
+.btn-primary:hover { background: var(--v-deep); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,.4); }
+.btn-ghost { background: transparent; border: 2px solid var(--border); color: var(--text-2); }
+.btn-ghost:hover { border-color: #d1d5db; }
+.btn-generate {
+  background: linear-gradient(135deg, var(--v) 0%, var(--v-deep) 100%);
+  color: #fff;
+  padding: 13px 34px;
+  font-size: .9rem;
+  box-shadow: 0 6px 22px rgba(91,33,182,.38);
+}
+.btn-generate:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(91,33,182,.45); }
+
+/* ── Spinner ─────────────────────────────────────────────────────── */
+.spinner-wrap {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 18px; padding: 64px 0;
+  color: var(--v); font-size: .9rem;
+}
+.spinner {
+  width: 46px; height: 46px;
+  border: 4px solid var(--v-light);
+  border-top-color: var(--v);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Result card ─────────────────────────────────────────────────── */
+#step-5 { max-width: 760px; padding: 0; overflow: hidden; }
+
+.trip-hero {
+  background: linear-gradient(135deg, #0d0b1f 0%, #1e1b4b 50%, #0f2a47 100%);
+  padding: 34px 38px;
+  position: relative; overflow: hidden;
+}
+.trip-hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(139,92,246,.14) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.hero-eye {
+  font-size: .67rem; text-transform: uppercase; letter-spacing: .14em;
+  color: rgba(255,255,255,.45);
+  position: relative; z-index: 1;
+}
+.hero-title {
+  font-size: 1.6rem; font-weight: 900; letter-spacing: -.02em;
+  color: #fff; margin-top: 8px; line-height: 1.25;
+  position: relative; z-index: 1;
+}
+.hero-chips {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px;
+  position: relative; z-index: 1;
+}
+.hero-chip {
+  background: rgba(255,255,255,.11);
+  border: 1px solid rgba(255,255,255,.18);
+  color: rgba(255,255,255,.88);
+  padding: 5px 13px; border-radius: 100px;
+  font-size: .75rem; font-weight: 600;
+}
+
+/* ── Map section ─────────────────────────────────────────────────── */
+.map-section {
+  background: var(--surface);
+  border-bottom: 1px solid #f0f0f8;
+}
+.map-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 38px 12px;
+}
+.map-title {
+  font-size: .9rem; font-weight: 800; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+}
+.map-legend { display: flex; gap: 12px; flex-wrap: wrap; }
+.legend-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: .72rem; color: var(--text-2);
+}
+.legend-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  flex-shrink: 0;
+}
+#map {
+  height: 300px;
+  width: 100%;
+}
+
+/* ── Result body ─────────────────────────────────────────────────── */
+.result-content { padding: 28px 38px; }
+.result-body {
+  font-size: .86rem; line-height: 1.8; color: #374151;
+}
+.result-body h2 {
+  font-size: 1.05rem; color: var(--text); font-weight: 800;
+  margin: 24px 0 8px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--v-light);
+}
+.result-body h3 {
+  font-size: .9rem; color: var(--v); font-weight: 700;
+  margin: 18px 0 5px;
+}
+.result-body hr { border: none; border-top: 1px solid #f0f0f8; margin: 14px 0; }
+
+/* Day header block */
+.result-body .day-header {
+  display: flex; align-items: center; gap: 10px;
+  margin: 26px 0 10px;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, var(--v-pale) 0%, #faf5ff 100%);
+  border-radius: 12px;
+  border-left: 4px solid var(--v);
+}
+.day-num {
+  background: var(--v);
+  color: #fff;
+  padding: 3px 11px; border-radius: 100px;
+  font-size: .72rem; font-weight: 900;
+  letter-spacing: .05em; white-space: nowrap;
+}
+.day-theme { font-weight: 700; font-size: .9rem; color: var(--text); }
+
+/* Weather card */
+.result-body .weather-card {
+  background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+  border-left: 4px solid var(--sky);
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin: 0 0 12px;
+  font-size: .82rem;
+  color: #0c4a6e;
+  font-weight: 500;
+  line-height: 1.65;
+}
+.result-body .weather-card .wx-src {
+  font-size: .7rem;
+  opacity: .55;
+  margin-left: 6px;
+  font-weight: 400;
+}
+
+.result-body table {
+  border-collapse: collapse; width: 100%;
+  margin: 10px 0; font-size: .82rem;
+  border-radius: 10px; overflow: hidden;
+}
+.result-body th, .result-body td {
+  border: 1px solid #e5e7eb;
+  padding: 8px 12px;
+}
+.result-body th { background: var(--v-pale); font-weight: 700; color: var(--text); }
+
+/* Result actions */
+.result-actions {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  padding: 18px 38px 30px;
+  border-top: 1px solid #f0f0f8;
+}
+.regen-box {
+  width: 100%;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px dashed #e5e7eb;
+}
+.action-btn {
+  font-size: .82rem; font-weight: 700;
+  cursor: pointer; border: none;
+  padding: 9px 20px; border-radius: 10px;
+  transition: all .2s;
+}
+.action-btn.save { background: var(--v-pale); color: var(--v-deep); }
+.action-btn.reset { background: var(--sky-pale); color: #075985; }
+.action-btn.regen { background: #ede9fe; color: #5b21b6; }
+.action-btn:hover { opacity: .85; transform: translateY(-1px); }
+
+.error-box {
+  background: #fef2f2; border: 2px solid #fecaca;
+  color: #b91c1c; border-radius: 12px;
+  padding: 14px 18px; font-size: .84rem;
+  margin: 0 38px 20px;
+}
+
+/* ── Map-first Planning Studio ───────────────────────────────────── */
+.studio-intro {
+  background: linear-gradient(135deg, #ede9fe 0%, #f0f9ff 100%);
+  border: 1px solid #ddd6fe;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: .82rem;
+  line-height: 1.6;
+  color: #4338ca;
+}
+.studio-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  gap: 14px;
+}
+.studio-col {
+  border: 1px solid #ede9fe;
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+}
+.studio-col h4 {
+  font-size: .8rem;
+  margin-bottom: 8px;
+  color: #312e81;
+}
+.studio-mini {
+  font-size: .76rem;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+.map-canvas {
+  height: 270px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+.route-ribbon {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.route-chip {
+  font-size: .72rem;
+  background: #f5f3ff;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.draft-days {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.draft-day {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.draft-day-title {
+  font-size: .75rem;
+  font-weight: 700;
+  color: #312e81;
+}
+.draft-day-flow {
+  margin-top: 4px;
+  font-size: .73rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+/* ── Multi-view result ───────────────────────────────────────────── */
+.hero-subtitle {
+  margin-top: 8px;
+  color: rgba(255,255,255,.8);
+  font-size: .82rem;
+  line-height: 1.6;
+  position: relative;
+  z-index: 1;
+}
+.result-layer {
+  border: 1px solid #ede9fe;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: #fff;
+}
+.layer-title {
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #6b7280;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.day-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.day-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fcfcff;
+}
+.day-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: .8rem;
+}
+.day-card-theme {
+  font-weight: 700;
+  color: #312e81;
+}
+.day-meta {
+  color: #6b7280;
+  font-size: .72rem;
+}
+.spot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.spot-item {
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+}
+.spot-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: .74rem;
+  gap: 8px;
+}
+.spot-name {
+  font-weight: 700;
+  color: #1f2937;
+}
+.spot-time {
+  color: #6b7280;
+  white-space: nowrap;
+}
+.spot-reason {
+  margin-top: 3px;
+  font-size: .72rem;
+  color: #4b5563;
+}
+.why-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.why-item {
+  font-size: .78rem;
+  color: #374151;
+  line-height: 1.5;
+  padding-left: 10px;
+  border-left: 3px solid #ddd6fe;
+}
 </style>
 </head>
 <body>
 <div class="shell">
 
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div>
-      <div class="sidebar-logo">✈️</div>
-      <h1>Welcome to<br>AI Travel Planner</h1>
-      <p>Personalized Hong Kong itineraries for university students in the Greater Bay Area.</p>
+<!-- ── Sidebar ─────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-hk">HK</div>
+    <div class="brand-name">Trip Curator</div>
+    <div class="brand-tagline">Your perfect Hong Kong experience, curated around your style, pace and real-time weather.</div>
+  </div>
+
+  <div class="snapshot" id="snapshot">
+    <div class="snap-label">Your trip so far</div>
+    <div class="snap-row"><span>📅 Dates</span><span class="snap-val" id="snap-dates">—</span></div>
+    <div class="snap-row"><span>💳 Budget</span><span class="snap-val" id="snap-budget">—</span></div>
+    <div class="snap-row"><span>🚶 Pace</span><span class="snap-val" id="snap-pace">—</span></div>
+    <div class="snap-row"><span>👥 Group</span><span class="snap-val" id="snap-group">—</span></div>
+  </div>
+
+  <nav class="steps" id="step-nav">
+    <div class="step-item active" data-s="1"><div class="step-dot">1</div><div class="step-lbl">Group & Dates</div></div>
+    <div class="step-item" data-s="2"><div class="step-dot">2</div><div class="step-lbl">Trip Shape</div></div>
+    <div class="step-item" data-s="3"><div class="step-dot">3</div><div class="step-lbl">Travel Style</div></div>
+    <div class="step-item" data-s="4"><div class="step-dot">4</div><div class="step-lbl">Preferences</div></div>
+    <div class="step-item" data-s="5"><div class="step-dot">5</div><div class="step-lbl">Your Itinerary</div></div>
+  </nav>
+</aside>
+
+<!-- ── Main ───────────────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- Step 1: Group & Dates -->
+  <div class="card" id="step-1">
+    <div class="card-eyebrow">Step 1 of 4</div>
+    <h2>Who's going & when?</h2>
+    <p class="sub">Tell us about your travel group and dates — we'll pull real weather forecasts for your trip.</p>
+
+    <div class="section-label">Travel Start Date</div>
+    <div class="field">
+      <input type="date" id="start-date" />
     </div>
-    <nav class="steps" id="step-nav">
-      <div class="step-item active" data-s="1"><div class="step-dot">1</div>Traveler Info</div>
-      <div class="step-item"        data-s="2"><div class="step-dot">2</div>Trip Details</div>
-      <div class="step-item"        data-s="3"><div class="step-dot">3</div>Interests</div>
-      <div class="step-item"        data-s="4"><div class="step-dot">4</div>Constraints</div>
-      <div class="step-item"        data-s="5"><div class="step-dot">5</div>Your Itinerary</div>
-    </nav>
-  </aside>
 
-  <!-- Main panel -->
-  <main class="main">
+    <div class="section-label">Who's Traveling?</div>
+    <div class="group-grid">
+      <div class="group-card active" data-val="solo" onclick="pickGroup(this)">
+        <div class="gc-icon">👤</div><div class="gc-lbl">Solo</div>
+      </div>
+      <div class="group-card" data-val="friends" onclick="pickGroup(this)">
+        <div class="gc-icon">👥</div><div class="gc-lbl">With Friends</div>
+      </div>
+      <div class="group-card" data-val="family" onclick="pickGroup(this)">
+        <div class="gc-icon">👨‍👩‍👧</div><div class="gc-lbl">Family</div>
+      </div>
+    </div>
 
-    <!-- Step 1 -->
-    <div class="card" id="step-1">
-      <h2>Tell us about yourself</h2>
-      <p class="sub">We'll personalize your experience based on your travel group.</p>
+    <div class="section-label">Special Considerations</div>
+    <div class="chip-grid">
+      <div class="chip" data-val="traveling_with_elderly" onclick="toggleChip(this)">
+        <span class="chip-icon">👴</span>With elderly
+      </div>
+      <div class="chip" data-val="traveling_with_children" onclick="toggleChip(this)">
+        <span class="chip-icon">👶</span>With children
+      </div>
+      <div class="chip" data-val="pregnant_traveler" onclick="toggleChip(this)">
+        <span class="chip-icon">🤰</span>Pregnant traveler
+      </div>
+    </div>
 
+    <div class="row" style="margin-top:22px">
       <div class="field">
         <label>Your Age</label>
         <input type="number" id="my-age" value="22" min="16" max="80" />
       </div>
-
-      <div class="row">
-        <div class="field">
-          <label>Number of Travellers</label>
-          <select id="group-size">
-            <option value="1">1 – Solo</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5+</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="field" id="extra-ages-wrap" style="display:none">
-        <label>Ages of Other Travellers</label>
-        <div class="age-list" id="extra-ages"></div>
-      </div>
-
       <div class="field">
-        <label>Special Considerations</label>
-        <div class="check-grid">
-          <label class="check-card"><input type="checkbox" name="special" value="traveling_with_elderly" /><span class="icon">👴</span>Traveling with elderly</label>
-          <label class="check-card"><input type="checkbox" name="special" value="traveling_with_children" /><span class="icon">👶</span>Traveling with children</label>
-          <label class="check-card"><input type="checkbox" name="special" value="pregnant_traveler" /><span class="icon">🤰</span>Pregnant traveler</label>
+        <label>Number of Travellers</label>
+        <div class="pill-group" id="size-pills">
+          <div class="pill active" data-val="1" onclick="pickSize(this)">1</div>
+          <div class="pill" data-val="2" onclick="pickSize(this)">2</div>
+          <div class="pill" data-val="3" onclick="pickSize(this)">3</div>
+          <div class="pill" data-val="4" onclick="pickSize(this)">4</div>
+          <div class="pill" data-val="5" onclick="pickSize(this)">5+</div>
         </div>
       </div>
+    </div>
+    <div class="section-label">Your custom requirement (this step)</div>
+    <textarea id="custom-step1" class="free-input" placeholder="Example: We will arrive after 15:00, and need hotel check-in friendly planning."></textarea>
+    <div class="free-hint">Anything not covered above can be added here.</div>
 
-      <div class="btn-row">
-        <button class="btn btn-primary" onclick="goTo(2)">Continue →</button>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="goTo(2)">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Trip Shape -->
+  <div class="card" id="step-2" style="display:none">
+    <div class="card-eyebrow">Step 2 of 4</div>
+    <h2>Shape your trip</h2>
+    <p class="sub">How many days, what budget, and at what pace?</p>
+
+    <div class="section-label">Duration</div>
+    <div class="pill-group" id="dur-pills">
+      <div class="pill" data-val="1" onclick="pickDur(this)">1 day</div>
+      <div class="pill" data-val="2" onclick="pickDur(this)">2 days</div>
+      <div class="pill active" data-val="3" onclick="pickDur(this)">3 days</div>
+      <div class="pill" data-val="4" onclick="pickDur(this)">4 days</div>
+      <div class="pill" data-val="5" onclick="pickDur(this)">5 days</div>
+    </div>
+
+    <div class="section-label">Budget</div>
+    <div class="budget-grid">
+      <div class="budget-card" data-val="low" onclick="pickBudget(this)">
+        <div class="budget-icon">💰</div>
+        <div class="budget-name">Budget</div>
+        <div class="budget-range">HKD 200–350<br>per person / day</div>
+      </div>
+      <div class="budget-card active" data-val="medium" onclick="pickBudget(this)">
+        <div class="budget-icon">💳</div>
+        <div class="budget-name">Moderate</div>
+        <div class="budget-range">HKD 500–800<br>per person / day</div>
+      </div>
+      <div class="budget-card" data-val="high" onclick="pickBudget(this)">
+        <div class="budget-icon">💎</div>
+        <div class="budget-name">Luxury</div>
+        <div class="budget-range">HKD 1,200+<br>per person / day</div>
       </div>
     </div>
 
-    <!-- Step 2 -->
-    <div class="card" id="step-2" style="display:none">
-      <h2>Trip Details</h2>
-      <p class="sub">Tell us about your Hong Kong trip plan.</p>
+    <div class="section-label">Pace</div>
+    <div class="pill-group" id="pace-pills">
+      <div class="pill" data-val="relaxed" onclick="pickPace(this)">🌿 Relaxed</div>
+      <div class="pill active" data-val="moderate" onclick="pickPace(this)">🚶 Moderate</div>
+      <div class="pill" data-val="packed" onclick="pickPace(this)">⚡ Packed</div>
+    </div>
+    <div class="section-label">Your custom requirement (this step)</div>
+    <textarea id="custom-step2" class="free-input" placeholder="Example: Keep total daily spend below HKD 700 and avoid too-early starts."></textarea>
+    <div class="free-hint">You can define hard limits or preferred rhythm.</div>
 
-      <div class="row">
-        <div class="field">
-          <label>Duration (days)</label>
-          <select id="days">
-            <option value="1">1 day</option>
-            <option value="2">2 days</option>
-            <option value="3" selected>3 days</option>
-            <option value="4">4 days</option>
-            <option value="5">5 days</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Budget Level</label>
-          <select id="budget">
-            <option value="low">💰 Low – student budget</option>
-            <option value="medium" selected>💳 Medium – moderate</option>
-            <option value="high">💎 High – luxury</option>
-          </select>
-        </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goTo(1)">← Back</button>
+      <button class="btn btn-primary" onclick="goTo(3)">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Travel Style -->
+  <div class="card" id="step-3" style="display:none">
+    <div class="card-eyebrow">Step 3 of 4</div>
+    <h2>Your travel style</h2>
+    <p class="sub">What kind of Hong Kong do you want to experience? Pick all that resonate.</p>
+
+    <div class="style-grid">
+      <div class="style-card" data-val="culture" onclick="toggleStyle(this)">
+        <span class="style-emoji">🏛️</span>
+        <div><div class="style-name">Culture & History</div><div class="style-desc">Temples, museums, heritage sites</div></div>
       </div>
-
-      <div class="field">
-        <label>Preferred Pace</label>
-        <div class="check-grid col3">
-          <div class="pace-btn" data-pace="relaxed"  onclick="setPace(this)"><span class="icon">🌿</span>Relaxed</div>
-          <div class="pace-btn picked" data-pace="moderate" onclick="setPace(this)"><span class="icon">🚶</span>Moderate</div>
-          <div class="pace-btn" data-pace="packed"   onclick="setPace(this)"><span class="icon">⚡</span>Packed</div>
-        </div>
+      <div class="style-card" data-val="scenic_views" onclick="toggleStyle(this)">
+        <span class="style-emoji">📸</span>
+        <div><div class="style-name">Scenic Views & Photos</div><div class="style-desc">Skylines, viewpoints, iconic spots</div></div>
       </div>
+      <div class="style-card" data-val="local_food" onclick="toggleStyle(this)">
+        <span class="style-emoji">🍜</span>
+        <div><div class="style-name">Local Food & Dining</div><div class="style-desc">Cha chaan teng, street food, dim sum</div></div>
+      </div>
+      <div class="style-card" data-val="shopping" onclick="toggleStyle(this)">
+        <span class="style-emoji">🛍️</span>
+        <div><div class="style-name">Shopping</div><div class="style-desc">Markets, malls, boutiques</div></div>
+      </div>
+      <div class="style-card" data-val="relaxation" onclick="toggleStyle(this)">
+        <span class="style-emoji">🌊</span>
+        <div><div class="style-name">Relaxation & Leisure</div><div class="style-desc">Parks, beaches, slow-paced days</div></div>
+      </div>
+      <div class="style-card" data-val="hidden_gems" onclick="toggleStyle(this)">
+        <span class="style-emoji">📍</span>
+        <div><div class="style-name">Hidden Gems</div><div class="style-desc">Local neighborhoods, off-the-beaten-path</div></div>
+      </div>
+      <div class="style-card" data-val="social_trendy" onclick="toggleStyle(this)">
+        <span class="style-emoji">✨</span>
+        <div><div class="style-name">Trendy & Social</div><div class="style-desc">Cafés, art spaces, cool bars</div></div>
+      </div>
+    </div>
+    <div class="section-label">Your custom requirement (this step)</div>
+    <textarea id="custom-step3" class="free-input" placeholder="Example: Must include one sunset photo spot and one authentic local food stop each day."></textarea>
+    <div class="free-hint">Describe must-have experiences in your own words.</div>
 
-      <div class="btn-row">
-        <button class="btn btn-ghost" onclick="goTo(1)">← Back</button>
-        <button class="btn btn-primary" onclick="goTo(3)">Continue →</button>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goTo(2)">← Back</button>
+      <button class="btn btn-primary" onclick="goTo(4)">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Preferences -->
+  <div class="card" id="step-4" style="display:none">
+    <div class="card-eyebrow">Step 4 of 4</div>
+    <h2>Map-first Planning Studio</h2>
+    <p class="sub">Adjust constraints and watch your route + draft days update in real time.</p>
+    <div class="studio-intro">
+      Hi, I'll help you build a Hong Kong trip that actually fits your pace, budget, and style.
+      Pick constraints like quick replies, then co-create your route visually.
+    </div>
+
+    <div class="section-label">Physical</div>
+    <div class="chip-grid">
+      <div class="chip" data-val="avoid_long_walking" onclick="toggleChip(this)">
+        <span class="chip-icon">🦵</span>Long walking routes
+      </div>
+      <div class="chip" data-val="avoid_many_location_changes" onclick="toggleChip(this)">
+        <span class="chip-icon">🔄</span>Too many location changes
       </div>
     </div>
 
-    <!-- Step 3 -->
-    <div class="card" id="step-3" style="display:none">
-      <h2>What would you like to experience?</h2>
-      <p class="sub">Select all that apply — pick at least one.</p>
-
-      <div class="check-grid">
-        <label class="check-card"><input type="checkbox" name="interest" value="culture" /><span class="icon">🏛️</span>Culture & History</label>
-        <label class="check-card"><input type="checkbox" name="interest" value="scenic_views" /><span class="icon">📸</span>Scenic Views & Photography</label>
-        <label class="check-card"><input type="checkbox" name="interest" value="local_food" /><span class="icon">🍜</span>Local Food & Dining</label>
-        <label class="check-card"><input type="checkbox" name="interest" value="shopping" /><span class="icon">🛍️</span>Shopping</label>
-        <label class="check-card"><input type="checkbox" name="interest" value="relaxation" /><span class="icon">🌊</span>Relaxation & Leisure</label>
-        <label class="check-card"><input type="checkbox" name="interest" value="hidden_gems" /><span class="icon">📍</span>Hidden Gems / Local</label>
-        <label class="check-card"><input type="checkbox" name="interest" value="social_trendy" /><span class="icon">✨</span>Social / Trendy Spots</label>
+    <div class="section-label">Crowds & Pace</div>
+    <div class="chip-grid">
+      <div class="chip" data-val="avoid_crowds" onclick="toggleChip(this)">
+        <span class="chip-icon">👥</span>Crowded tourist areas
       </div>
-
-      <div class="btn-row">
-        <button class="btn btn-ghost" onclick="goTo(2)">← Back</button>
-        <button class="btn btn-primary" onclick="goTo(4)">Continue →</button>
+      <div class="chip" data-val="avoid_packed_schedule" onclick="toggleChip(this)">
+        <span class="chip-icon">📅</span>Over-packed schedule
       </div>
     </div>
 
-    <!-- Step 4 -->
-    <div class="card" id="step-4" style="display:none">
-      <h2>What would you prefer to avoid?</h2>
-      <p class="sub">Optional — skip if no restrictions.</p>
-
-      <p class="section-label">Physical</p>
-      <div class="check-grid">
-        <label class="check-card"><input type="checkbox" name="constraint" value="avoid_long_walking" /><span class="icon">🦵</span>Long walking routes</label>
-        <label class="check-card"><input type="checkbox" name="constraint" value="avoid_many_location_changes" /><span class="icon">🔄</span>Too many location changes</label>
+    <div class="section-label">Budget & Style</div>
+    <div class="chip-grid">
+      <div class="chip" data-val="avoid_outdoor_heavy" onclick="toggleChip(this)">
+        <span class="chip-icon">🌤️</span>Outdoor-heavy activities
       </div>
-
-      <p class="section-label">Crowds & Pace</p>
-      <div class="check-grid">
-        <label class="check-card"><input type="checkbox" name="constraint" value="avoid_crowds" /><span class="icon">👥</span>Crowded tourist areas</label>
-        <label class="check-card"><input type="checkbox" name="constraint" value="avoid_packed_schedule" /><span class="icon">📅</span>Packed schedule</label>
+      <div class="chip" data-val="avoid_expensive" onclick="toggleChip(this)">
+        <span class="chip-icon">💸</span>Expensive options
       </div>
+    </div>
+    <div class="section-label">Your custom requirement (this step)</div>
+    <textarea id="custom-step4" class="free-input" placeholder="Example: Please minimize stairs and keep transfers simple after dinner."></textarea>
+    <div class="free-hint">Add special constraints, accessibility needs, or route preferences.</div>
 
-      <p class="section-label">Budget & Style</p>
-      <div class="check-grid">
-        <label class="check-card"><input type="checkbox" name="constraint" value="avoid_outdoor_heavy" /><span class="icon">🌤️</span>Outdoor-heavy activities</label>
-        <label class="check-card"><input type="checkbox" name="constraint" value="avoid_expensive" /><span class="icon">💸</span>Expensive options</label>
+    <div class="studio-grid">
+      <div class="studio-col">
+        <h4>Left · Preferences & Constraints</h4>
+        <div class="studio-mini">These settings shape route efficiency and crowd avoidance.</div>
+        <div class="route-ribbon" id="pref-ribbon"></div>
       </div>
-
-      <div class="btn-row">
-        <button class="btn btn-ghost" onclick="goTo(3)">← Back</button>
-        <button class="btn btn-primary" onclick="generate()">✨ Generate Plan</button>
+      <div class="studio-col">
+        <h4>Center · Hong Kong Map</h4>
+        <div class="studio-mini">Hotspot clusters and flow update as you change constraints.</div>
+        <div class="map-canvas" id="studio-map"></div>
+        <div class="route-ribbon" id="studio-route-ribbon"></div>
+      </div>
+      <div class="studio-col">
+        <h4>Right · Day Draft</h4>
+        <div class="studio-mini">Early route skeleton before final AI generation.</div>
+        <div class="draft-days" id="studio-day-draft"></div>
       </div>
     </div>
 
-    <!-- Step 5: Result -->
-    <div class="card" id="step-5" style="display:none; max-width:700px">
-      <div class="spinner-wrap" id="spinner">
-        <div class="spinner"></div>
-        <p>Generating your personalized itinerary…</p>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goTo(3)">← Back</button>
+      <button class="btn btn-generate" onclick="generate()">✨ Curate My Trip</button>
+    </div>
+  </div>
+
+  <!-- Step 5: Result -->
+  <div class="card" id="step-5" style="display:none">
+    <!-- Loading -->
+    <div class="spinner-wrap" id="spinner">
+      <div class="spinner"></div>
+      <p>Fetching live weather &amp; curating your itinerary…</p>
+    </div>
+
+    <!-- Result -->
+    <div id="result-area" style="display:none">
+      <!-- Hero -->
+      <div class="trip-hero">
+        <div class="hero-eye">Your curated Hong Kong experience</div>
+        <div class="hero-title" id="hero-title">Your Itinerary</div>
+        <div class="hero-chips" id="hero-chips"></div>
+        <div class="hero-subtitle" id="hero-subtitle"></div>
       </div>
-      <div id="result-area" style="display:none">
-        <h2>🗺️ Your Hong Kong Itinerary</h2>
-        <p class="sub">Generated just for you.</p>
-        <div class="result-body" id="result-body"></div>
+
+      <!-- Map -->
+      <div class="map-section" id="map-section" style="display:none">
+        <div class="map-header">
+          <div class="map-title">🗺️ Route Overview</div>
+          <div class="map-legend" id="map-legend"></div>
+        </div>
+        <div id="map"></div>
+      </div>
+
+      <!-- Itinerary text -->
+      <div class="result-content">
+        <div class="result-layer">
+          <div class="layer-title">Layer 2 · Route Flow</div>
+          <div id="flow-summary" class="result-body"></div>
+        </div>
+        <div class="result-layer">
+          <div class="layer-title">Layer 3 · Day-by-day Cards</div>
+          <div class="day-cards" id="day-cards"></div>
+        </div>
+        <div class="result-layer">
+          <div class="layer-title">Layer 4 · Why this plan works for you</div>
+          <div class="why-list" id="why-panel"></div>
+        </div>
+        <div class="result-layer">
+          <div class="layer-title">Full Itinerary (Detailed)</div>
+          <div class="result-body" id="result-body"></div>
+        </div>
         <div class="error-box" id="error-box" style="display:none"></div>
-        <div class="action-row">
-          <button class="action-btn save"  onclick="saveItinerary()">💾 Save as .txt</button>
-          <button class="action-btn reset" onclick="resetAll()">↩ Plan another trip</button>
+      </div>
+
+      <div class="result-actions">
+        <button class="action-btn save" onclick="saveItinerary()">💾 Save as .txt</button>
+        <button class="action-btn reset" onclick="resetAll()">↩ Plan another trip</button>
+        <div class="regen-box">
+          <div class="section-label" style="margin-top:0">Not satisfied? Add new requirements and regenerate</div>
+          <textarea id="regen-feedback" class="free-input" placeholder="Example: Day 2 is too packed. Please reduce walking, add one night market, and keep daily budget under HKD 700."></textarea>
+          <div class="btn-row" style="margin-top:10px">
+            <button class="action-btn regen" onclick="regenerateWithFeedback()">🔁 Regenerate with my new requirements</button>
+          </div>
         </div>
       </div>
     </div>
+  </div>
 
-  </main>
+</main>
 </div>
 
 <script>
-  let currentStep = 1;
-  let selectedPace = "moderate";
-  let itineraryText = "";
+// ── State ─────────────────────────────────────────────────────────
+let currentStep = 1;
+let selGroup    = "solo";
+let selSize     = 1;
+let selDur      = 3;
+let selBudget   = "medium";
+let selPace     = "moderate";
+let itineraryText = "";
+let leafletMap  = null;
+let studioMap   = null;
 
-  // ── Wire up checkbox cards on load ──────────────────────────────
-  document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll(".check-card").forEach(card => {
-      const cb = card.querySelector("input[type=checkbox]");
-      if (!cb) return;
-      // Clicking the card label naturally toggles the hidden checkbox.
-      // We just listen for the change event to update the visual state.
-      cb.addEventListener("change", () => {
-        card.classList.toggle("picked", cb.checked);
+const DAY_COLORS = ["#8b5cf6","#0ea5e9","#f59e0b","#10b981","#ef4444","#ec4899"];
+const STUDIO_CLUSTERS = {
+  culture: ["Central", "Sheung Wan", "West Kowloon"],
+  scenic_views: ["The Peak", "Tsim Sha Tsui Promenade", "Sai Kung"],
+  local_food: ["Mong Kok", "Sham Shui Po", "Causeway Bay"],
+  shopping: ["Causeway Bay", "Tsim Sha Tsui", "Mong Kok"],
+  relaxation: ["Lantau", "Sai Kung", "West Kowloon"],
+  hidden_gems: ["Tai Hang", "Kennedy Town", "Sham Shui Po"],
+  social_trendy: ["SoHo", "PMQ", "West Kowloon"],
+};
+const DISTRICT_COORDS = {
+  Central: [22.2820, 114.1588],
+  "Sheung Wan": [22.2867, 114.1500],
+  "West Kowloon": [22.3049, 114.1618],
+  "The Peak": [22.2759, 114.1454],
+  "Tsim Sha Tsui Promenade": [22.2947, 114.1722],
+  "Sai Kung": [22.3837, 114.2707],
+  "Mong Kok": [22.3193, 114.1694],
+  "Sham Shui Po": [22.3305, 114.1622],
+  "Causeway Bay": [22.2808, 114.1839],
+  "Lantau": [22.2619, 113.9460],
+  "Tai Hang": [22.2784, 114.1912],
+  "Kennedy Town": [22.2827, 114.1276],
+  "SoHo": [22.2835, 114.1525],
+  PMQ: [22.2841, 114.1492],
+};
+
+// Default start date: today + 14 days
+(function() {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  document.getElementById("start-date").value = d.toISOString().split("T")[0];
+})();
+
+// ── Navigation ────────────────────────────────────────────────────
+function goTo(n) {
+  document.getElementById("step-" + currentStep).style.display = "none";
+  document.getElementById("step-" + n).style.display          = "block";
+  currentStep = n;
+  document.querySelectorAll(".step-item").forEach(el => {
+    const s = parseInt(el.dataset.s);
+    el.classList.toggle("active", s === currentStep);
+    el.classList.toggle("done",   s < currentStep);
+  });
+  updateSnapshot();
+  // Invalidate map size when result step is shown
+  if (n === 5 && leafletMap) setTimeout(() => leafletMap.invalidateSize(), 50);
+  if (n === 4) setTimeout(() => updateStudioPreview(), 50);
+}
+
+// ── Sidebar snapshot ──────────────────────────────────────────────
+function updateSnapshot() {
+  if (currentStep < 2) {
+    document.getElementById("snapshot").classList.remove("visible");
+    return;
+  }
+  document.getElementById("snapshot").classList.add("visible");
+  const d = document.getElementById("start-date").value;
+  document.getElementById("snap-dates").textContent  = d ? `${d} · ${selDur}d` : `${selDur} days`;
+  document.getElementById("snap-budget").textContent = {low:"Budget",medium:"Moderate",high:"Luxury"}[selBudget];
+  document.getElementById("snap-pace").textContent   = selPace.charAt(0).toUpperCase() + selPace.slice(1);
+  document.getElementById("snap-group").textContent  = selSize + (selSize > 1 ? " people" : " person");
+}
+
+// ── Pickers ───────────────────────────────────────────────────────
+function pickGroup(el) {
+  document.querySelectorAll(".group-card").forEach(c => c.classList.remove("active"));
+  el.classList.add("active");
+  selGroup = el.dataset.val;
+  updateStudioPreview();
+}
+function pickSize(el) {
+  document.querySelectorAll("#size-pills .pill").forEach(p => p.classList.remove("active"));
+  el.classList.add("active");
+  selSize = parseInt(el.dataset.val);
+  updateStudioPreview();
+}
+function pickDur(el) {
+  document.querySelectorAll("#dur-pills .pill").forEach(p => p.classList.remove("active"));
+  el.classList.add("active");
+  selDur = parseInt(el.dataset.val);
+  updateSnapshot();
+  updateStudioPreview();
+}
+function pickBudget(el) {
+  document.querySelectorAll(".budget-card").forEach(c => c.classList.remove("active"));
+  el.classList.add("active");
+  selBudget = el.dataset.val;
+  updateSnapshot();
+  updateStudioPreview();
+}
+function pickPace(el) {
+  document.querySelectorAll("#pace-pills .pill").forEach(p => p.classList.remove("active"));
+  el.classList.add("active");
+  selPace = el.dataset.val;
+  updateSnapshot();
+  updateStudioPreview();
+}
+function toggleStyle(el) {
+  el.classList.toggle("active");
+  updateStudioPreview();
+}
+function toggleChip(el)  {
+  el.classList.toggle("active");
+  updateStudioPreview();
+}
+
+// ── Collect data ──────────────────────────────────────────────────
+function collectData(extraFeedback = "") {
+  const interests   = [...document.querySelectorAll(".style-card.active")].map(e => e.dataset.val);
+  const constraints = [...document.querySelectorAll("#step-4 .chip.active")].map(e => e.dataset.val);
+  const special     = [...document.querySelectorAll("#step-1 .chip.active")].map(e => e.dataset.val);
+  const custom_step1 = (document.getElementById("custom-step1").value || "").trim();
+  const custom_step2 = (document.getElementById("custom-step2").value || "").trim();
+  const custom_step3 = (document.getElementById("custom-step3").value || "").trim();
+  const custom_step4 = (document.getElementById("custom-step4").value || "").trim();
+  return {
+    ages:        [parseInt(document.getElementById("my-age").value) || 22],
+    group_size:  selSize,
+    group_type:  selGroup,
+    special,
+    start_date:  document.getElementById("start-date").value,
+    days:        selDur,
+    budget:      selBudget,
+    pace:        selPace,
+    interests,
+    constraints,
+    custom_requirements: {
+      step1_group_dates: custom_step1,
+      step2_trip_shape: custom_step2,
+      step3_travel_style: custom_step3,
+      step4_constraints_route: custom_step4,
+      regeneration_feedback: (extraFeedback || "").trim(),
+    },
+  };
+}
+
+// ── Build hero ────────────────────────────────────────────────────
+function buildHero(data) {
+  const bl = {low:"Budget",medium:"Moderate",high:"Luxury"}[data.budget];
+  const pl = data.pace.charAt(0).toUpperCase() + data.pace.slice(1);
+  document.getElementById("hero-title").textContent = `${data.days}-Day Hong Kong Experience`;
+  const topInterests = data.interests.slice(0, 2).map(v => v.replace("_", " ")).join(" + ");
+  const avoidLabel = data.constraints.length ? `Avoids ${data.constraints[0].replaceAll("_", " ")}` : "Balanced routes";
+  document.getElementById("hero-subtitle").textContent =
+    `Designed for a ${data.group_size > 1 ? "group" : "traveler"} who wants ${topInterests || "local highlights"} with a ${data.pace} pace and route-efficient planning. ${avoidLabel}.`;
+  document.getElementById("hero-chips").innerHTML = [
+    `💳 ${bl} Budget`,
+    `🚶 ${pl} Pace`,
+    `👥 ${data.group_size} Traveller${data.group_size > 1 ? "s" : ""}`,
+    data.start_date ? `📅 From ${data.start_date}` : "",
+  ].filter(Boolean).map(t => `<span class="hero-chip">${t}</span>`).join("");
+}
+
+function buildStudioRoute(data) {
+  const interests = data.interests.length ? data.interests : ["culture", "local_food", "scenic_views"];
+  const pool = interests.flatMap(k => STUDIO_CLUSTERS[k] || []);
+  const unique = [...new Set(pool)];
+  const maxStops = Math.max(3, data.days + 2);
+  return unique.slice(0, maxStops);
+}
+
+function renderStudioMap(route) {
+  const mapWrap = document.getElementById("studio-map");
+  if (!mapWrap) return;
+  if (studioMap) {
+    studioMap.remove();
+    studioMap = null;
+  }
+  studioMap = L.map("studio-map", { zoomControl: false }).setView([22.31, 114.17], 11);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap",
+    maxZoom: 18,
+  }).addTo(studioMap);
+  const coords = [];
+  route.forEach((name, idx) => {
+    const c = DISTRICT_COORDS[name];
+    if (!c) return;
+    coords.push(c);
+    const icon = L.divIcon({
+      className: "",
+      html: `<div style="width:24px;height:24px;border-radius:50%;background:${DAY_COLORS[idx % DAY_COLORS.length]};border:2px solid #fff;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;">${idx + 1}</div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
+    L.marker(c, { icon }).addTo(studioMap).bindPopup(name);
+  });
+  if (coords.length > 1) {
+    L.polyline(coords, { color: "#7c3aed", weight: 2, opacity: 0.65, dashArray: "6 4" }).addTo(studioMap);
+    studioMap.fitBounds(coords, { padding: [20, 20] });
+  }
+}
+
+function updateStudioPreview() {
+  const mapEl = document.getElementById("studio-map");
+  if (!mapEl || currentStep !== 4) return;
+  const data = collectData();
+  const route = buildStudioRoute(data);
+  renderStudioMap(route);
+
+  const pref = document.getElementById("pref-ribbon");
+  const prefChips = [
+    `Budget: ${data.budget}`,
+    `Pace: ${data.pace}`,
+    ...data.constraints.map(c => c.replaceAll("_", " ")),
+  ];
+  if (data.custom_requirements.step4_constraints_route) {
+    prefChips.push("custom route note");
+  }
+  pref.innerHTML = prefChips.map(v => `<span class="route-chip">${v}</span>`).join("");
+
+  const routeRibbon = document.getElementById("studio-route-ribbon");
+  routeRibbon.innerHTML = route.map(v => `<span class="route-chip">${v}</span>`).join("");
+
+  const dayDraft = document.getElementById("studio-day-draft");
+  const perDay = Math.ceil(route.length / Math.max(1, data.days));
+  const cards = [];
+  for (let i = 0; i < data.days; i++) {
+    const seg = route.slice(i * perDay, (i + 1) * perDay);
+    if (!seg.length) continue;
+    cards.push(`<div class="draft-day">
+      <div class="draft-day-title">Day ${i + 1}</div>
+      <div class="draft-day-flow">${seg.join(" → ")}</div>
+    </div>`);
+  }
+  dayDraft.innerHTML = cards.join("");
+}
+
+// ── Map rendering ─────────────────────────────────────────────────
+function renderMap(mapData, coordsDb) {
+  const mapSection = document.getElementById("map-section");
+  if (!mapData || typeof mapData !== "object" || !coordsDb) return;
+
+  // Verify at least one attraction has coords
+  const hasAny = Object.values(mapData).flat().some(name => coordsDb[name]);
+  if (!hasAny) return;
+
+  mapSection.style.display = "block";
+
+  if (leafletMap) { leafletMap.remove(); leafletMap = null; }
+  leafletMap = L.map("map", { zoomControl: true }).setView([22.32, 114.17], 12);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a>",
+    maxZoom: 18,
+  }).addTo(leafletMap);
+
+  const legendEl = document.getElementById("map-legend");
+  legendEl.innerHTML = "";
+
+  Object.entries(mapData).forEach(([dayKey, names], idx) => {
+    const color = DAY_COLORS[idx % DAY_COLORS.length];
+    const dayNum = idx + 1;
+    const latlngs = [];
+
+    names.forEach(name => {
+      const c = coordsDb[name];
+      if (!c) return;
+      latlngs.push([c.lat, c.lng]);
+
+      // Custom colored marker
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="
+          width:32px;height:32px;border-radius:50%;
+          background:${color};border:3px solid #fff;
+          box-shadow:0 2px 8px rgba(0,0,0,.3);
+          display:flex;align-items:center;justify-content:center;
+          color:#fff;font-size:11px;font-weight:800;">${dayNum}</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -18],
       });
+
+      L.marker([c.lat, c.lng], { icon })
+        .addTo(leafletMap)
+        .bindPopup(`<strong style="font-size:.85rem">${name}</strong><br><span style="color:${color};font-size:.75rem;font-weight:600">Day ${dayNum}</span>`);
     });
 
-    document.getElementById("group-size").addEventListener("change", updateAgeInputs);
+    if (latlngs.length > 1) {
+      L.polyline(latlngs, { color, weight: 2.5, opacity: 0.65, dashArray: "7 5" }).addTo(leafletMap);
+    }
+
+    // Legend entry
+    legendEl.innerHTML += `<div class="legend-item">
+      <div class="legend-dot" style="background:${color}"></div>
+      <span>Day ${dayNum}</span>
+    </div>`;
   });
 
-  // ── Navigation ──────────────────────────────────────────────────
-  function goTo(n) {
-    document.getElementById("step-" + currentStep).style.display = "none";
-    document.getElementById("step-" + n).style.display = "block";
-    currentStep = n;
-    document.querySelectorAll(".step-item").forEach(el => {
-      const s = parseInt(el.dataset.s);
-      el.classList.toggle("active", s === currentStep);
-      el.classList.toggle("done",   s < currentStep);
-    });
-  }
+  // Fit bounds to all markers
+  const allCoords = Object.values(mapData).flat()
+    .map(n => coordsDb[n])
+    .filter(Boolean)
+    .map(c => [c.lat, c.lng]);
+  if (allCoords.length > 1) leafletMap.fitBounds(allCoords, { padding: [30, 30] });
+}
 
-  // ── Extra traveller ages ────────────────────────────────────────
-  function updateAgeInputs() {
-    const n = parseInt(document.getElementById("group-size").value);
-    const wrap = document.getElementById("extra-ages-wrap");
-    const list = document.getElementById("extra-ages");
-    list.innerHTML = "";
-    if (n <= 1) { wrap.style.display = "none"; return; }
-    wrap.style.display = "block";
-    for (let i = 2; i <= n; i++) {
-      const chip = document.createElement("div");
-      chip.className = "age-chip";
-      chip.innerHTML = `Traveller ${i}: <input type="number" class="extra-age" value="22" min="1" max="100" />`;
-      list.appendChild(chip);
+// ── Parse map_data JSON block from response ───────────────────────
+function extractMapData(text) {
+  // Try multiple patterns for robustness
+  const patterns = [
+    /```map_data\s*\n([\s\S]+?)\n\s*```/,
+    /```map_data([\s\S]+?)```/,
+  ];
+  for (const pat of patterns) {
+    const m = text.match(pat);
+    if (!m) continue;
+    try { return JSON.parse(m[1].trim()); } catch { continue; }
+  }
+  return null;
+}
+
+function cleanMdInline(s) {
+  return (s || "")
+    .replace(/\*\*/g, "")
+    .replace(/`/g, "")
+    .replace(/\[(WEATHER)\]/g, "$1")
+    .trim();
+}
+
+function parseDayCards(text) {
+  const lines = text.split("\n");
+  const days = [];
+  let current = null;
+  for (const lineRaw of lines) {
+    const line = lineRaw.trim();
+    const dayMatch =
+      line.match(/^\*\*Day\s+(\d+)\s*(?:–|-)\s*(.+?)\*\*/) ||
+      line.match(/^###\s*Day\s+(\d+)\s*(?:–|-)\s*(.+)$/i) ||
+      line.match(/^Day\s+(\d+)\s*(?:–|-)\s*(.+)$/i);
+    if (dayMatch) {
+      if (current) days.push(current);
+      current = { day: dayMatch[1], theme: cleanMdInline(dayMatch[2]), weather: "", spots: [] };
+      continue;
     }
-  }
-
-  // ── Pace selection ──────────────────────────────────────────────
-  function setPace(el) {
-    document.querySelectorAll(".pace-btn").forEach(b => b.classList.remove("picked"));
-    el.classList.add("picked");
-    selectedPace = el.dataset.pace;
-  }
-
-  // ── Collect form data ───────────────────────────────────────────
-  function collectData() {
-    const myAge = parseInt(document.getElementById("my-age").value) || 22;
-    const groupSize = parseInt(document.getElementById("group-size").value) || 1;
-    const extraAges = [...document.querySelectorAll(".extra-age")].map(i => parseInt(i.value) || 22);
-    return {
-      ages:        [myAge, ...extraAges],
-      group_size:  groupSize,
-      special:     checked("special"),
-      days:        parseInt(document.getElementById("days").value),
-      budget:      document.getElementById("budget").value,
-      pace:        selectedPace,
-      interests:   checked("interest"),
-      constraints: checked("constraint"),
-    };
-  }
-
-  function checked(name) {
-    return [...document.querySelectorAll(`[name=${name}]:checked`)].map(i => i.value);
-  }
-
-  // ── Generate ────────────────────────────────────────────────────
-  async function generate() {
-    const data = collectData();
-    if (!data.interests.length) {
-      alert("Please select at least one interest before generating.");
-      return;
+    if (!current) continue;
+    if (line.startsWith("[WEATHER]")) {
+      current.weather = cleanMdInline(line.replace("[WEATHER]", "").trim());
+      continue;
     }
-    goTo(5);
-    document.getElementById("spinner").style.display = "flex";
-    document.getElementById("result-area").style.display = "none";
-    document.getElementById("error-box").style.display = "none";
-
-    try {
-      const res  = await fetch("/api/plan", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(data),
+    const spotMatch = line.match(/^-?\s*(\d{1,2}:\d{2})\s*[·-]\s*(.+)$/);
+    if (spotMatch) {
+      const body = spotMatch[2];
+      const [name, ...rest] = body.split("—");
+      current.spots.push({
+        time: spotMatch[1],
+        name: cleanMdInline(name || ""),
+        reason: cleanMdInline(rest.join("—") || ""),
       });
-      const json = await res.json();
-      document.getElementById("spinner").style.display = "none";
-      document.getElementById("result-area").style.display = "block";
-
-      if (json.ok) {
-        itineraryText = json.itinerary;
-        document.getElementById("result-body").innerHTML = mdToHtml(json.itinerary);
-      } else {
-        showError(json.error);
-      }
-    } catch (e) {
-      document.getElementById("spinner").style.display = "none";
-      document.getElementById("result-area").style.display = "block";
-      showError("Network error: " + e.message);
     }
   }
+  if (current) days.push(current);
+  return days;
+}
 
-  function showError(msg) {
-    const eb = document.getElementById("error-box");
-    eb.style.display = "block";
-    eb.textContent = "Error: " + msg;
-  }
+function renderResultViews(itinerary, mapData, weatherData) {
+  const flowEl = document.getElementById("flow-summary");
+  const dayCardsEl = document.getElementById("day-cards");
+  const whyEl = document.getElementById("why-panel");
+  const dayCards = parseDayCards(itinerary);
 
-  // ── Minimal markdown renderer ───────────────────────────────────
-  function mdToHtml(text) {
-    // Tables: collect rows between pipe lines
-    text = text.replace(/\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)+)/g, (_, header, body) => {
-      const hCells = header.split("|").slice(1,-1).map(c => `<th>${c.trim()}</th>`).join("");
-      const rows   = body.trim().split("\n").map(row => {
-        const cells = row.split("|").slice(1,-1).map(c => `<td>${c.trim()}</td>`).join("");
-        return `<tr>${cells}</tr>`;
-      }).join("");
-      return `<table><thead><tr>${hCells}</tr></thead><tbody>${rows}</tbody></table>`;
+  let flows = mapData
+    ? Object.values(mapData).map((arr, idx) => `Day ${idx + 1}: ${arr.join(" → ")}`)
+    : [];
+  if (!flows.length && dayCards.length) {
+    flows = dayCards.map(d => {
+      const names = d.spots.slice(0, 4).map(s => s.name).filter(Boolean);
+      return names.length ? `Day ${d.day}: ${names.join(" → ")}` : `Day ${d.day}: Route planned`;
     });
-    return text
-      .replace(/^## (.+)$/gm,   "<h2>$1</h2>")
-      .replace(/^### (.+)$/gm,  "<h3>$1</h3>")
-      .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
-      .replace(/^---$/gm,       "<hr>")
-      .replace(/\n/g,           "<br>");
   }
+  flowEl.innerHTML = flows.length
+    ? flows.map(f => `<div style="margin-bottom:6px">${f}</div>`).join("")
+    : "<div>Route flow will appear after itinerary parsing.</div>";
 
-  // ── Save ────────────────────────────────────────────────────────
-  function saveItinerary() {
-    const blob = new Blob([itineraryText], { type: "text/plain" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "hk_itinerary.txt";
-    a.click();
-  }
+  const forecasts = weatherData && Array.isArray(weatherData.forecasts) ? weatherData.forecasts : [];
+  dayCardsEl.innerHTML = dayCards.length
+    ? dayCards.map(d => `<div class="day-card">
+      <div class="day-card-head">
+        <div class="day-card-theme">Day ${d.day} · ${d.theme}</div>
+        <div class="day-meta">${
+          d.weather ||
+          (() => {
+            const f = forecasts[Number(d.day) - 1];
+            return f ? `${f.emoji} ${f.condition} · ${f.temp_low_c}–${f.temp_high_c}°C · Rain ${f.rain_probability_pct}%` : "Weather pending";
+          })()
+        }</div>
+      </div>
+      <div class="spot-list">
+        ${d.spots.slice(0, 4).map(s => `<div class="spot-item">
+          <div class="spot-top"><span class="spot-name">${cleanMdInline(s.name) || "Activity"}</span><span class="spot-time">${s.time}</span></div>
+          <div class="spot-reason">${s.reason || "Chosen to match your interests and route efficiency."}</div>
+        </div>`).join("")}
+      </div>
+    </div>`).join("")
+    : `<div class="day-card">Itinerary cards will appear after generation.</div>`;
 
-  // ── Reset ───────────────────────────────────────────────────────
-  function resetAll() {
-    document.querySelectorAll("input[type=checkbox]").forEach(cb => {
-      cb.checked = false;
-      cb.closest(".check-card")?.classList.remove("picked");
+  const reasons = [
+    "Attractions are grouped by area to reduce backtracking across districts.",
+    "The daily pacing aligns with your selected comfort level and constraints.",
+    "Crowded or overly rushed route segments are intentionally deprioritized.",
+    "The route sequence balances iconic spots with practical transport flow.",
+  ];
+  whyEl.innerHTML = reasons.map(r => `<div class="why-item">${r}</div>`).join("");
+}
+
+// ── Inject server-guaranteed weather cards ────────────────────────
+function insertWeatherCards(weatherData) {
+  if (!weatherData || !Array.isArray(weatherData.forecasts)) return;
+  const body = document.getElementById("result-body");
+  // Remove any weather cards the AI regex may have already created (avoid duplicates)
+  body.querySelectorAll(".weather-card").forEach(el => el.remove());
+  // Insert one card per day-header, using the structured server data
+  const headers = body.querySelectorAll(".day-header");
+  const srcLabel = weatherData.source === "live_forecast" ? "Live forecast" : "Seasonal estimate";
+  if (headers.length) {
+    headers.forEach((header, idx) => {
+      const f = weatherData.forecasts[idx];
+      if (!f) return;
+      const card = document.createElement("div");
+      card.className = "weather-card";
+      card.innerHTML =
+        `${f.emoji} <strong>${f.condition}</strong> · ${f.date} · ` +
+        `${f.temp_low_c}–${f.temp_high_c}°C · Humidity ${f.humidity_pct}% · ` +
+        `☔ Rain ${f.rain_probability_pct}% — ${f.recommendation}` +
+        `<span class="wx-src">${srcLabel}</span>`;
+      header.insertAdjacentElement("afterend", card);
     });
-    setPace(document.querySelector("[data-pace=moderate]"));
-    goTo(1);
+    return;
   }
+  const wrap = document.createElement("div");
+  wrap.style.marginBottom = "10px";
+  wrap.innerHTML = weatherData.forecasts.map(f =>
+    `<div class="weather-card">${f.emoji} <strong>${f.condition}</strong> · Day ${f.day} · ${f.date} · ${f.temp_low_c}–${f.temp_high_c}°C · Humidity ${f.humidity_pct}% · ☔ Rain ${f.rain_probability_pct}% — ${f.recommendation}<span class="wx-src">${srcLabel}</span></div>`
+  ).join("");
+  body.prepend(wrap);
+}
+
+// ── Markdown renderer ─────────────────────────────────────────────
+function mdToHtml(text) {
+  // Strip map_data block from visible output
+  text = text.replace(/```map_data[\s\S]*?```/g, "");
+  // Tables
+  text = text.replace(/\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)+)/g, (_, header, body) => {
+    const hCells = header.split("|").slice(1,-1).map(c => `<th>${c.trim()}</th>`).join("");
+    const rows = body.trim().split("\n").map(row => {
+      const cells = row.split("|").slice(1,-1).map(c => `<td>${c.trim()}</td>`).join("");
+      return `<tr>${cells}</tr>`;
+    }).join("");
+    return `<table><thead><tr>${hCells}</tr></thead><tbody>${rows}</tbody></table>`;
+  });
+  // Day header blocks — FIX: use (?:–|-) not [–-] (invalid range, causes SyntaxError)
+  text = text.replace(/^\*\*Day (\d+)\s*(?:–|-)\s*(.+?)\*\*\s*$/gm,
+    '<div class="day-header"><span class="day-num">Day $1</span><span class="day-theme">$2</span></div>');
+  return text
+    .replace(/^## (.+)$/gm,    "<h2>$1</h2>")
+    .replace(/^### (.+)$/gm,   "<h3>$1</h3>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/^---$/gm,        "<hr>")
+    .replace(/\n/g,            "<br>");
+}
+
+// ── Generate ──────────────────────────────────────────────────────
+async function generate() {
+  const data = collectData();
+  if (!data.interests.length) {
+    alert("Please select at least one travel style before generating.");
+    return;
+  }
+  goTo(5);
+  document.getElementById("spinner").style.display      = "flex";
+  document.getElementById("result-area").style.display  = "none";
+  document.getElementById("map-section").style.display  = "none";
+
+  try {
+    const res  = await fetch("/api/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    document.getElementById("spinner").style.display     = "none";
+    document.getElementById("result-area").style.display = "block";
+
+    if (json.ok) {
+      itineraryText = json.itinerary;
+      buildHero(data);
+      document.getElementById("result-body").innerHTML = mdToHtml(json.itinerary);
+
+      // Inject weather cards from guaranteed server-side data (not AI-text parsing)
+      insertWeatherCards(json.weather_data);
+
+      // Render map
+      const mapData = extractMapData(json.itinerary);
+      renderMap(mapData, json.attraction_coords);
+      renderResultViews(json.itinerary, mapData, json.weather_data);
+
+      // Scroll to top of result
+      document.getElementById("step-5").scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      showError(json.error);
+    }
+  } catch (e) {
+    document.getElementById("spinner").style.display     = "none";
+    document.getElementById("result-area").style.display = "block";
+    showError("Network error: " + e.message);
+  }
+}
+
+async function regenerateWithFeedback() {
+  const feedback = (document.getElementById("regen-feedback").value || "").trim();
+  if (!feedback) {
+    alert("Please enter your new requirement before regenerating.");
+    return;
+  }
+  const data = collectData(feedback);
+  if (!data.interests.length) {
+    alert("Please select at least one travel style before generating.");
+    return;
+  }
+  goTo(5);
+  document.getElementById("spinner").style.display      = "flex";
+  document.getElementById("result-area").style.display  = "none";
+  document.getElementById("map-section").style.display  = "none";
+  try {
+    const res  = await fetch("/api/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    document.getElementById("spinner").style.display     = "none";
+    document.getElementById("result-area").style.display = "block";
+    if (json.ok) {
+      itineraryText = json.itinerary;
+      buildHero(data);
+      document.getElementById("result-body").innerHTML = mdToHtml(json.itinerary);
+      insertWeatherCards(json.weather_data);
+      const mapData = extractMapData(json.itinerary);
+      renderMap(mapData, json.attraction_coords);
+      renderResultViews(json.itinerary, mapData, json.weather_data);
+      document.getElementById("step-5").scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      showError(json.error);
+    }
+  } catch (e) {
+    document.getElementById("spinner").style.display     = "none";
+    document.getElementById("result-area").style.display = "block";
+    showError("Network error: " + e.message);
+  }
+}
+
+function showError(msg) {
+  const eb = document.getElementById("error-box");
+  eb.style.display = "block";
+  eb.textContent   = "Error: " + msg;
+}
+
+// ── Save & Reset ──────────────────────────────────────────────────
+function saveItinerary() {
+  const blob = new Blob([itineraryText], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href     = URL.createObjectURL(blob);
+  a.download = "hk_itinerary.txt";
+  a.click();
+}
+
+function resetAll() {
+  selGroup = "solo"; selSize = 1; selDur = 3; selBudget = "medium"; selPace = "moderate";
+  document.querySelectorAll(".style-card.active, .chip.active").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".group-card").forEach((c,i) => c.classList.toggle("active", i === 0));
+  document.querySelectorAll("#size-pills  .pill").forEach((p,i) => p.classList.toggle("active", i === 0));
+  document.querySelectorAll("#dur-pills   .pill").forEach((p,i) => p.classList.toggle("active", i === 2));
+  document.querySelectorAll(".budget-card"      ).forEach((c,i) => c.classList.toggle("active", i === 1));
+  document.querySelectorAll("#pace-pills  .pill").forEach((p,i) => p.classList.toggle("active", i === 1));
+  if (leafletMap) { leafletMap.remove(); leafletMap = null; }
+  if (studioMap) { studioMap.remove(); studioMap = null; }
+  const regenEl = document.getElementById("regen-feedback");
+  if (regenEl) regenEl.value = "";
+  goTo(1);
+}
 </script>
 </body>
 </html>

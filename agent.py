@@ -1,16 +1,42 @@
 # Hong Kong Travel Planner Agent
-# Modules: Constraint Parser → Profile Builder → Data Retrieval → Itinerary Engine → Budget & Hotel Recommender → Output Generator
+# Modules: Constraint Parser → Weather Forecast → Profile Builder → Data Retrieval → Itinerary Engine → Budget & Hotel Recommender → Output Generator
 
 import json
 import os
+import requests
+from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
-from data import HK_ATTRACTIONS, HK_HOTELS, BUDGET_TIERS, TRANSPORT
+from data import HK_ATTRACTIONS, HK_HOTELS, BUDGET_TIERS, TRANSPORT, HK_WEATHER_BY_MONTH
 
 load_dotenv(Path(__file__).parent / ".env")
 
 MODEL = "gpt-4o"
+
+# ── WMO weather code → (description, emoji) ──────────────────────────────────
+
+WMO_CONDITIONS = {
+    0:  ("Clear Sky",           "☀️"),
+    1:  ("Mainly Clear",        "🌤️"),
+    2:  ("Partly Cloudy",       "⛅"),
+    3:  ("Overcast",            "☁️"),
+    45: ("Foggy",               "🌫️"),
+    48: ("Rime Fog",            "🌫️"),
+    51: ("Light Drizzle",       "🌦️"),
+    53: ("Drizzle",             "🌦️"),
+    55: ("Dense Drizzle",       "🌦️"),
+    61: ("Light Rain",          "🌧️"),
+    63: ("Moderate Rain",       "🌧️"),
+    65: ("Heavy Rain",          "🌧️"),
+    80: ("Light Showers",       "🌦️"),
+    81: ("Moderate Showers",    "🌧️"),
+    82: ("Heavy Showers",       "🌧️"),
+    95: ("Thunderstorm",        "⛈️"),
+    96: ("Thunderstorm",        "⛈️"),
+    99: ("Severe Thunderstorm", "⛈️"),
+}
+
 
 # ── Tool definitions (OpenAI function-calling format) ─────────────────────────
 
@@ -73,6 +99,31 @@ TOOLS = [
                     },
                 },
                 "required": ["duration_days", "budget_level", "group_size", "interests", "pace"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather_forecast",
+            "description": (
+                "Get a day-by-day weather forecast for Hong Kong for the trip dates. "
+                "Uses real Open-Meteo forecast data if within 15 days; otherwise uses seasonal climate averages. "
+                "Returns condition, temperature, humidity, rain probability, and practical tips per day."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "start_date": {
+                        "type": "string",
+                        "description": "Trip start date in YYYY-MM-DD format",
+                    },
+                    "duration_days": {
+                        "type": "integer",
+                        "description": "Number of trip days to forecast",
+                    },
+                },
+                "required": ["start_date", "duration_days"],
             },
         },
     },
@@ -188,6 +239,147 @@ def _parse_constraints(args: dict) -> dict:
     }
 
 
+def _build_weather_recommendation(rain_prob: int, uv: int, humidity: int, temp_high: int, temp_low: int) -> str:
+    tips = []
+    if rain_prob >= 60:
+        tips.append("bring an umbrella — high chance of rain")
+    elif rain_prob >= 30:
+        tips.append("pack a compact umbrella as a precaution")
+    if uv >= 9:
+        tips.append("UV index is very high — apply SPF 50+ sunscreen")
+    elif uv >= 7:
+        tips.append("UV index is high — apply sunscreen before heading out")
+    if humidity >= 84:
+        tips.append("very humid — wear light breathable clothing and stay hydrated")
+    elif temp_high >= 30:
+        tips.append("hot weather — plan indoor breaks and drink plenty of water")
+    elif temp_high <= 16:
+        tips.append("bring a warm jacket for outdoor activities")
+    elif temp_high <= 20:
+        tips.append("light jacket recommended for mornings and evenings")
+    if not tips:
+        tips.append("comfortable conditions — great for outdoor exploration")
+    return ". ".join(t.capitalize() for t in tips) + "."
+
+
+def _get_weather_forecast(args: dict) -> dict:
+    start_date_str = args.get("start_date", "")
+    duration_days = max(1, int(args.get("duration_days", 3)))
+
+    # Parse start date
+    try:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        start_date = datetime.today() + timedelta(days=14)
+        start_date_str = start_date.strftime("%Y-%m-%d")
+
+    end_date = start_date + timedelta(days=duration_days - 1)
+    days_until_trip = (start_date - datetime.today()).days
+
+    # ── Real forecast via Open-Meteo (within 15 days) ─────────────────────
+    if days_until_trip <= 15:
+        try:
+            resp = requests.get(
+                "https://api.open-meteo.com/v1/forecast",
+                params={
+                    "latitude": 22.3193,
+                    "longitude": 114.1694,
+                    "daily": ",".join([
+                        "temperature_2m_max",
+                        "temperature_2m_min",
+                        "precipitation_probability_max",
+                        "weathercode",
+                        "relative_humidity_2m_mean",
+                        "uv_index_max",
+                    ]),
+                    "timezone": "Asia/Hong_Kong",
+                    "start_date": start_date_str,
+                    "end_date": end_date.strftime("%Y-%m-%d"),
+                },
+                timeout=8,
+            )
+            resp.raise_for_status()
+            daily = resp.json()["daily"]
+
+            forecasts = []
+            for i in range(min(duration_days, len(daily["time"]))):
+                wmo = int(daily["weathercode"][i] or 1)
+                condition, emoji = WMO_CONDITIONS.get(wmo, ("Partly Cloudy", "⛅"))
+                rain_prob = int(daily["precipitation_probability_max"][i] or 0)
+                temp_high = round(daily["temperature_2m_max"][i] or 25)
+                temp_low  = round(daily["temperature_2m_min"][i] or 20)
+                humidity  = round(daily["relative_humidity_2m_mean"][i] or 75)
+                uv        = round(daily["uv_index_max"][i] or 5)
+
+                forecasts.append({
+                    "day": i + 1,
+                    "date": daily["time"][i],
+                    "emoji": emoji,
+                    "condition": condition,
+                    "temp_high_c": temp_high,
+                    "temp_low_c": temp_low,
+                    "humidity_pct": humidity,
+                    "rain_probability_pct": rain_prob,
+                    "uv_index": uv,
+                    "recommendation": _build_weather_recommendation(rain_prob, uv, humidity, temp_high, temp_low),
+                })
+
+            return {
+                "source": "live_forecast",
+                "note": "Live 15-day forecast from Open-Meteo.",
+                "forecasts": forecasts,
+            }
+        except Exception:
+            pass  # fall through to climate data
+
+    # ── Climate averages fallback (trip is far in the future) ─────────────
+    month = start_date.month
+    monthly = HK_WEATHER_BY_MONTH[month]
+    variations = monthly["daily_variations"]
+
+    forecasts = []
+    for day_idx in range(duration_days):
+        var = variations[day_idx % len(variations)]
+        rain_prob = max(0, min(100, monthly["rain_probability_pct"] + var["rain_delta"]))
+        temp_high = monthly["temp_high_c"] + var["temp_delta"]
+        temp_low  = monthly["temp_low_c"]  + var["temp_delta"]
+
+        condition_emojis = {
+            "Sunny": "☀️", "Sunny & Hot": "☀️", "Hot & Sunny": "☀️",
+            "Partly Cloudy": "⛅", "Clear & Breezy": "🌤️", "Clear & Cool": "🌤️",
+            "Cool & Clear": "🌤️", "Cloudy": "☁️", "Overcast": "☁️",
+            "Cloudy & Hot": "☁️", "Hot & Humid": "🌫️", "Misty": "🌫️",
+            "Light Rain": "🌦️", "Cloudy with Showers": "🌦️",
+            "Occasional Showers": "🌦️", "Overcast with Rain": "🌧️",
+            "Heavy Showers": "🌧️", "Heavy Rain": "🌧️",
+            "Thunderstorms": "⛈️",
+        }
+        condition = var["condition"]
+        emoji = condition_emojis.get(condition, "⛅")
+        date_str = (start_date + timedelta(days=day_idx)).strftime("%Y-%m-%d")
+
+        forecasts.append({
+            "day": day_idx + 1,
+            "date": date_str,
+            "emoji": emoji,
+            "condition": condition,
+            "temp_high_c": temp_high,
+            "temp_low_c": temp_low,
+            "humidity_pct": monthly["humidity_pct"],
+            "rain_probability_pct": rain_prob,
+            "uv_index": monthly["uv_index"],
+            "recommendation": _build_weather_recommendation(
+                rain_prob, monthly["uv_index"], monthly["humidity_pct"], temp_high, temp_low
+            ),
+        })
+
+    return {
+        "source": "climate_averages",
+        "note": f"Seasonal climate averages for {monthly['name']} — {monthly['general_advisory']}",
+        "forecasts": forecasts,
+    }
+
+
 def _get_attractions(args: dict) -> list:
     interests = set(args["interests"])
     constraints = set(args.get("constraints", []))
@@ -285,25 +477,27 @@ def _get_transport_info(args: dict) -> dict:
 
 def _run_tool(name: str, args: dict):
     return {
-        "parse_constraints":       _parse_constraints,
-        "get_attractions":         _get_attractions,
+        "parse_constraints":         _parse_constraints,
+        "get_weather_forecast":      _get_weather_forecast,
+        "get_attractions":           _get_attractions,
         "get_hotel_recommendations": _get_hotel_recommendations,
-        "calculate_budget":        _calculate_budget,
-        "get_transport_info":      _get_transport_info,
+        "calculate_budget":          _calculate_budget,
+        "get_transport_info":        _get_transport_info,
     }[name](args)
 
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are the Hong Kong Travel Planner Agent, designed for university students from the Greater Bay Area visiting Hong Kong.
+SYSTEM_PROMPT = """You are the Hong Kong Trip Curator Agent, designed for university students from the Greater Bay Area visiting Hong Kong.
 
 Your job is to produce a personalized, day-by-day travel itinerary following this pipeline:
 1. Call `parse_constraints` to build the traveler profile from user input.
-2. Call `get_attractions` to retrieve matching HK attractions.
-3. Call `get_hotel_recommendations` to suggest accommodation.
-4. Call `calculate_budget` using the cheapest recommended hotel's nightly rate.
-5. Optionally call `get_transport_info` for key route segments.
-6. Generate the final itinerary.
+2. Call `get_weather_forecast` using the start_date and duration from the user request.
+3. Call `get_attractions` to retrieve matching HK attractions.
+4. Call `get_hotel_recommendations` to suggest accommodation.
+5. Call `calculate_budget` using the cheapest recommended hotel's nightly rate.
+6. Optionally call `get_transport_info` for key route segments.
+7. Generate the final itinerary.
 
 Output format (use exactly this structure):
 
@@ -319,14 +513,16 @@ Output format (use exactly this structure):
 
 ### Day-by-Day Plan
 **Day 1 – [Theme]**
-- 09:00 · [Attraction] — [1-line description] · [transport from hotel] ~X min
+[WEATHER] {emoji} {condition} · {date} · {temp_low}–{temp_high}°C · Humidity {humidity}% · ☔ Rain {rain_prob}% — {recommendation}
+- 09:00 · [Attraction Name] — [1-line description] · [transport from hotel] ~X min
 - 11:30 · ...
-- 13:00 · Lunch: [local recommendation]
+- 13:00 · 🍜 Lunch: [local recommendation]
 - ...
-- Evening: [suggestion]
+- 🌆 Evening: [suggestion]
 
 **Day 2 – [Theme]**
-...
+[WEATHER] {emoji} {condition} · {date} · {temp_low}–{temp_high}°C · Humidity {humidity}% · ☔ Rain {rain_prob}% — {recommendation}
+- ...
 
 ### Hotel Recommendations
 1. **[Name]** · [Area] · HKD [price]/night — [why it suits this traveler]
@@ -341,15 +537,26 @@ Output format (use exactly this structure):
 | Hotel | ... | ... |
 | **Total** | ... | ... |
 
+### Why This Plan Works For You
+- [Explain 3–4 specific reasons: geographic clustering, constraint respect, style match, etc.]
+
 ### Tips
-- [3-5 practical tips relevant to this specific traveler profile]
+- [3–5 practical tips relevant to this specific traveler profile]
 ---
+
+After the closing ---, append a machine-readable map block (STRICTLY VALID JSON, no trailing commas):
+```map_data
+{"day_1": ["Exact Attraction Name A", "Exact Attraction Name B"], "day_2": ["Exact Attraction Name C"], "day_3": [...]}
+```
 
 Rules:
 - Only recommend attractions from the tool results; do not invent ones not returned.
+- In the map_data block, use the EXACT attraction names as returned by get_attractions (copy them verbatim).
 - Group geographically close attractions on the same day to minimize transit.
 - Respect all constraints (e.g., avoid crowds, avoid long walking).
-- Explain briefly WHY each hotel and route was chosen (explainability requirement from the report).
+- The [WEATHER] line MUST be the very first item under each day heading. Use exact forecast data from get_weather_forecast — one forecast entry per day in order.
+- The literal text `[WEATHER]` must appear at the start of each weather line — the frontend uses it to render a styled weather card.
+- Explain briefly WHY each hotel and route was chosen.
 - Keep the tone friendly and practical for university students.
 """
 
@@ -374,7 +581,6 @@ def plan_trip(user_request: str) -> str:
         msg = response.choices[0].message
         finish = response.choices[0].finish_reason
 
-        # Always serialize to plain dict so the SDK accepts it on the next turn
         assistant_dict = {"role": "assistant", "content": msg.content or ""}
         if msg.tool_calls:
             assistant_dict["tool_calls"] = [
