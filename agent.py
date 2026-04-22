@@ -372,12 +372,25 @@ def plan_trip(user_request: str) -> str:
         )
 
         msg = response.choices[0].message
-        messages.append(msg)
+        finish = response.choices[0].finish_reason
 
-        if response.choices[0].finish_reason == "stop":
+        # Always serialize to plain dict so the SDK accepts it on the next turn
+        assistant_dict = {"role": "assistant", "content": msg.content or ""}
+        if msg.tool_calls:
+            assistant_dict["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                }
+                for tc in msg.tool_calls
+            ]
+        messages.append(assistant_dict)
+
+        if finish == "stop":
             return msg.content or ""
 
-        if response.choices[0].finish_reason == "tool_calls":
+        if finish == "tool_calls":
             for tc in msg.tool_calls:
                 args = json.loads(tc.function.arguments)
                 result = _run_tool(tc.function.name, args)
