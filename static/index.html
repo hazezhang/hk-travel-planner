@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HK AI Travel Planner</title>
+<style>
+  /* ── Reset & base ───────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f5f5fa;
+    color: #222;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ─────────────────────────────────────── */
+  .shell {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+  .sidebar {
+    background: linear-gradient(160deg, #5b4fcf 0%, #3b3491 100%);
+    color: #fff;
+    padding: 48px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+  .sidebar-logo { font-size: 2rem; }
+  .sidebar h1 { font-size: 1.5rem; font-weight: 700; line-height: 1.3; }
+  .sidebar p  { font-size: 0.85rem; opacity: .75; line-height: 1.6; margin-top: 8px; }
+
+  /* step nav */
+  .steps { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+  .step-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; border-radius: 10px;
+    font-size: 0.85rem; opacity: .55; transition: opacity .2s, background .2s;
+    cursor: default;
+  }
+  .step-item.active { opacity: 1; background: rgba(255,255,255,.15); }
+  .step-item.done   { opacity: .8; }
+  .step-dot {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(255,255,255,.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: .75rem; font-weight: 700; flex-shrink: 0;
+  }
+  .step-item.active .step-dot { background: #fff; color: #5b4fcf; }
+  .step-item.done   .step-dot { background: #a5f3c4; color: #065f46; }
+
+  /* ── Main panel ─────────────────────────────────── */
+  .main {
+    padding: 48px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 40px;
+    width: 100%;
+    max-width: 620px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.07);
+  }
+  .card h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; }
+  .card .sub { color: #666; font-size: .88rem; margin-bottom: 28px; }
+
+  /* ── Form elements ──────────────────────────────── */
+  label { display: block; font-size: .82rem; font-weight: 600; color: #444; margin-bottom: 6px; }
+  input[type=number], input[type=text], select {
+    width: 100%; padding: 10px 14px; border: 1.5px solid #e0e0e0;
+    border-radius: 10px; font-size: .9rem; outline: none;
+    transition: border .2s;
+  }
+  input:focus, select:focus { border-color: #5b4fcf; }
+  .field { margin-bottom: 20px; }
+  .row   { display: flex; gap: 14px; }
+  .row .field { flex: 1; }
+
+  /* traveler ages row */
+  .age-list { display: flex; flex-wrap: wrap; gap: 10px; }
+  .age-item {
+    display: flex; align-items: center; gap: 6px;
+    background: #f3f0ff; border-radius: 8px; padding: 6px 10px;
+    font-size: .82rem;
+  }
+  .age-item input { width: 60px; padding: 4px 8px; }
+
+  /* checkbox grid */
+  .check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .check-card {
+    border: 1.5px solid #e5e5e5; border-radius: 12px; padding: 12px 14px;
+    cursor: pointer; display: flex; align-items: center; gap: 10px;
+    transition: border .15s, background .15s;
+    font-size: .85rem; user-select: none;
+  }
+  .check-card input[type=checkbox] { display: none; }
+  .check-card .icon { font-size: 1.2rem; }
+  .check-card:hover  { border-color: #bbb; }
+  .check-card.picked { border-color: #5b4fcf; background: #f3f0ff; }
+
+  /* ── Buttons ────────────────────────────────────── */
+  .btn-row { display: flex; justify-content: flex-end; gap: 12px; margin-top: 28px; }
+  .btn {
+    padding: 11px 28px; border-radius: 10px; font-size: .9rem;
+    font-weight: 600; cursor: pointer; border: none; transition: opacity .15s;
+  }
+  .btn:hover { opacity: .88; }
+  .btn-primary { background: #5b4fcf; color: #fff; }
+  .btn-ghost   { background: transparent; border: 1.5px solid #ddd; color: #555; }
+
+  /* ── Result ─────────────────────────────────────── */
+  #result-card { display: none; }
+  .itinerary-body {
+    white-space: pre-wrap;
+    font-size: .88rem;
+    line-height: 1.7;
+    color: #333;
+    max-height: 65vh;
+    overflow-y: auto;
+    padding-right: 6px;
+  }
+  /* markdown-ish styling */
+  .itinerary-body h2  { font-size: 1.2rem; margin: 16px 0 6px; color: #3b3491; }
+  .itinerary-body h3  { font-size: 1rem; margin: 14px 0 4px; color: #5b4fcf; }
+  .itinerary-body strong { color: #222; }
+  .itinerary-body table {
+    border-collapse: collapse; width: 100%; margin: 8px 0;
+    font-size: .82rem;
+  }
+  .itinerary-body th, .itinerary-body td {
+    border: 1px solid #e0e0e0; padding: 6px 10px; text-align: left;
+  }
+  .itinerary-body th { background: #f3f0ff; }
+
+  /* loading spinner */
+  .spinner-wrap {
+    display: none; flex-direction: column; align-items: center;
+    gap: 16px; padding: 48px 0; color: #5b4fcf;
+  }
+  .spinner {
+    width: 44px; height: 44px; border: 4px solid #e0daff;
+    border-top-color: #5b4fcf; border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* error */
+  .error-box {
+    display: none; background: #fff0f0; border: 1.5px solid #f7c0c0;
+    color: #b91c1c; border-radius: 10px; padding: 12px 16px;
+    font-size: .85rem; margin-top: 12px;
+  }
+
+  /* save btn */
+  .save-btn {
+    margin-top: 16px; font-size: .82rem;
+    background: #f3f0ff; color: #5b4fcf; border: none;
+    padding: 8px 18px; border-radius: 8px; cursor: pointer; font-weight: 600;
+  }
+  .save-btn:hover { background: #e8e2ff; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div>
+      <div class="sidebar-logo">✈️</div>
+      <h1>Welcome to<br>AI Travel Planner</h1>
+      <p>Personalized Hong Kong itineraries for university students in the Greater Bay Area.</p>
+    </div>
+    <nav class="steps" id="step-nav">
+      <div class="step-item active" data-s="1"><div class="step-dot">1</div>Traveler Info</div>
+      <div class="step-item"        data-s="2"><div class="step-dot">2</div>Trip Details</div>
+      <div class="step-item"        data-s="3"><div class="step-dot">3</div>Interests</div>
+      <div class="step-item"        data-s="4"><div class="step-dot">4</div>Constraints</div>
+      <div class="step-item"        data-s="5"><div class="step-dot">5</div>Your Itinerary</div>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Step 1: Traveler Info -->
+    <div class="card" id="step-1">
+      <h2>Tell us about yourself</h2>
+      <p class="sub">We'll personalize your experience based on your travel group.</p>
+
+      <div class="field">
+        <label>Your Age</label>
+        <input type="number" id="my-age" value="22" min="16" max="80" />
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Number of Travellers</label>
+          <select id="group-size" onchange="updateAgeInputs()">
+            <option value="1">1 (Solo)</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5+</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field" id="extra-ages-wrap" style="display:none">
+        <label>Ages of Other Travellers</label>
+        <div class="age-list" id="extra-ages"></div>
+      </div>
+
+      <div class="field">
+        <label>Special Considerations</label>
+        <div class="check-grid">
+          <label class="check-card" onclick="toggle(this)">
+            <input type="checkbox" name="special" value="traveling_with_elderly" />
+            <span class="icon">👴</span> Traveling with elderly
+          </label>
+          <label class="check-card" onclick="toggle(this)">
+            <input type="checkbox" name="special" value="traveling_with_children" />
+            <span class="icon">👶</span> Traveling with children
+          </label>
+          <label class="check-card" onclick="toggle(this)">
+            <input type="checkbox" name="special" value="pregnant_traveler" />
+            <span class="icon">🤰</span> Pregnant traveler
+          </label>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="goTo(2)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Trip Details -->
+    <div class="card" id="step-2" style="display:none">
+      <h2>Trip Details</h2>
+      <p class="sub">Tell us about your Hong Kong trip plan.</p>
+
+      <div class="row">
+        <div class="field">
+          <label>Duration (days)</label>
+          <select id="days">
+            <option value="1">1 day</option>
+            <option value="2">2 days</option>
+            <option value="3" selected>3 days</option>
+            <option value="4">4 days</option>
+            <option value="5">5 days</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Budget Level</label>
+          <select id="budget">
+            <option value="low">Low – student budget</option>
+            <option value="medium" selected>Medium – moderate spend</option>
+            <option value="high">High – luxury</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Preferred Pace</label>
+        <div class="check-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+          <label class="check-card" id="pace-relaxed" onclick="setPace('relaxed')">
+            <span class="icon">🌿</span> Relaxed
+          </label>
+          <label class="check-card picked" id="pace-moderate" onclick="setPace('moderate')">
+            <span class="icon">🚶</span> Moderate
+          </label>
+          <label class="check-card" id="pace-packed" onclick="setPace('packed')">
+            <span class="icon">⚡</span> Packed
+          </label>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="goTo(1)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(3)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Interests -->
+    <div class="card" id="step-3" style="display:none">
+      <h2>What would you like to experience?</h2>
+      <p class="sub">Select all that apply.</p>
+
+      <div class="check-grid">
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="interest" value="culture" />
+          <span class="icon">🏛️</span> Culture & History
+        </label>
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="interest" value="scenic_views" />
+          <span class="icon">📸</span> Scenic Views & Photography
+        </label>
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="interest" value="local_food" />
+          <span class="icon">🍜</span> Local Food & Dining
+        </label>
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="interest" value="shopping" />
+          <span class="icon">🛍️</span> Shopping
+        </label>
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="interest" value="relaxation" />
+          <span class="icon">🌊</span> Relaxation & Leisure
+        </label>
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="interest" value="hidden_gems" />
+          <span class="icon">📍</span> Hidden Gems / Local Experience
+        </label>
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="interest" value="social_trendy" />
+          <span class="icon">✨</span> Social / Trendy Spots
+        </label>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="goTo(2)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(4)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Constraints -->
+    <div class="card" id="step-4" style="display:none">
+      <h2>What would you prefer to avoid?</h2>
+      <p class="sub">We'll tailor your itinerary around these preferences.</p>
+
+      <p style="font-size:.8rem;color:#888;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Physical</p>
+      <div class="check-grid" style="margin-bottom:16px">
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="constraint" value="avoid_long_walking" />
+          <span class="icon">🦵</span> Long walking routes
+        </label>
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="constraint" value="avoid_many_location_changes" />
+          <span class="icon">🔄</span> Too many location changes
+        </label>
+      </div>
+
+      <p style="font-size:.8rem;color:#888;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Crowds & Pace</p>
+      <div class="check-grid" style="margin-bottom:16px">
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="constraint" value="avoid_crowds" />
+          <span class="icon">👥</span> Crowded tourist areas
+        </label>
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="constraint" value="avoid_packed_schedule" />
+          <span class="icon">📅</span> A packed schedule
+        </label>
+      </div>
+
+      <p style="font-size:.8rem;color:#888;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Budget & Style</p>
+      <div class="check-grid">
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="constraint" value="avoid_outdoor_heavy" />
+          <span class="icon">🌤️</span> Outdoor-heavy activities
+        </label>
+        <label class="check-card" onclick="toggle(this)">
+          <input type="checkbox" name="constraint" value="avoid_expensive" />
+          <span class="icon">💸</span> Expensive options
+        </label>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="goTo(3)">← Back</button>
+        <button class="btn btn-primary" onclick="generate()">✨ Generate Plan</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Result -->
+    <div class="card" id="step-5" style="display:none; max-width:720px">
+      <div class="spinner-wrap" id="spinner">
+        <div class="spinner"></div>
+        <p>Generating your personalized itinerary…</p>
+      </div>
+      <div id="result-card">
+        <h2>🗺️ Your Hong Kong Itinerary</h2>
+        <p class="sub">Generated just for you.</p>
+        <div class="itinerary-body" id="itinerary-output"></div>
+        <div class="error-box" id="error-box"></div>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <button class="save-btn" onclick="saveItinerary()">💾 Save as .txt</button>
+          <button class="save-btn" onclick="goTo(1)" style="background:#f0f9ff;color:#0369a1">↩ Plan another trip</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  let currentStep = 1;
+  let selectedPace = "moderate";
+  let itineraryText = "";
+
+  // ── Navigation ──────────────────────────────────────────────────
+  function goTo(n) {
+    document.getElementById("step-" + currentStep).style.display = "none";
+    document.getElementById("step-" + n).style.display = "block";
+    currentStep = n;
+    updateNav();
+  }
+
+  function updateNav() {
+    document.querySelectorAll(".step-item").forEach(el => {
+      const s = parseInt(el.dataset.s);
+      el.classList.remove("active", "done");
+      if (s === currentStep) el.classList.add("active");
+      else if (s < currentStep) el.classList.add("done");
+    });
+  }
+
+  // ── Traveler ages ────────────────────────────────────────────────
+  function updateAgeInputs() {
+    const n = parseInt(document.getElementById("group-size").value);
+    const wrap = document.getElementById("extra-ages-wrap");
+    const list = document.getElementById("extra-ages");
+    list.innerHTML = "";
+    if (n <= 1) { wrap.style.display = "none"; return; }
+    wrap.style.display = "block";
+    for (let i = 2; i <= n; i++) {
+      list.innerHTML += `<div class="age-item">Traveller ${i}: <input type="number" class="extra-age" value="22" min="1" max="100" /></div>`;
+    }
+  }
+
+  // ── Checkbox toggle ──────────────────────────────────────────────
+  function toggle(el) {
+    el.classList.toggle("picked");
+    const cb = el.querySelector("input[type=checkbox]");
+    if (cb) cb.checked = !cb.checked;
+  }
+
+  // ── Pace selection ───────────────────────────────────────────────
+  function setPace(p) {
+    selectedPace = p;
+    ["relaxed","moderate","packed"].forEach(x =>
+      document.getElementById("pace-" + x).classList.toggle("picked", x === p)
+    );
+  }
+
+  // ── Collect form data ────────────────────────────────────────────
+  function collectData() {
+    const myAge = parseInt(document.getElementById("my-age").value) || 22;
+    const groupSize = parseInt(document.getElementById("group-size").value) || 1;
+    const extraAges = [...document.querySelectorAll(".extra-age")].map(i => parseInt(i.value) || 22);
+    const ages = [myAge, ...extraAges];
+    const special   = [...document.querySelectorAll('[name=special]:checked')].map(i => i.value);
+    const days      = parseInt(document.getElementById("days").value);
+    const budget    = document.getElementById("budget").value;
+    const interests = [...document.querySelectorAll('[name=interest]:checked')].map(i => i.value);
+    const constraints = [...document.querySelectorAll('[name=constraint]:checked')].map(i => i.value);
+    return { ages, group_size: groupSize, special, days, budget, pace: selectedPace, interests, constraints };
+  }
+
+  // ── Render markdown-ish text ─────────────────────────────────────
+  function renderMarkdown(text) {
+    return text
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #eee;margin:12px 0">')
+      .replace(/^\|(.+)\|$/gm, row => {
+        const cells = row.split('|').slice(1,-1).map(c => c.trim());
+        const isHeader = cells.some(c => /^[-:]+$/.test(c));
+        if (isHeader) return '';
+        const tag = 'td';
+        return '<tr>' + cells.map(c => `<${tag}>${c}</${tag}>`).join('') + '</tr>';
+      })
+      .replace(/((<tr>.+<\/tr>\n?)+)/gs, '<table>$1</table>');
+  }
+
+  // ── Generate itinerary ───────────────────────────────────────────
+  async function generate() {
+    const data = collectData();
+    if (!data.interests.length) {
+      alert("Please select at least one interest before generating."); return;
+    }
+    goTo(5);
+    document.getElementById("spinner").style.display = "flex";
+    document.getElementById("result-card").style.display = "none";
+    document.getElementById("error-box").style.display = "none";
+
+    try {
+      const res = await fetch("/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      document.getElementById("spinner").style.display = "none";
+      document.getElementById("result-card").style.display = "block";
+      if (json.ok) {
+        itineraryText = json.itinerary;
+        document.getElementById("itinerary-output").innerHTML = renderMarkdown(json.itinerary);
+      } else {
+        const eb = document.getElementById("error-box");
+        eb.style.display = "block";
+        eb.textContent = "Error: " + json.error;
+      }
+    } catch (e) {
+      document.getElementById("spinner").style.display = "none";
+      document.getElementById("result-card").style.display = "block";
+      const eb = document.getElementById("error-box");
+      eb.style.display = "block";
+      eb.textContent = "Network error: " + e.message;
+    }
+  }
+
+  // ── Save as txt ──────────────────────────────────────────────────
+  function saveItinerary() {
+    const blob = new Blob([itineraryText], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "hk_itinerary.txt";
+    a.click();
+  }
+</script>
+</body>
+</html>
