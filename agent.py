@@ -9,6 +9,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 from data import HK_ATTRACTIONS, HK_HOTELS, BUDGET_TIERS, TRANSPORT, HK_WEATHER_BY_MONTH
+from food_rag import (
+    ensure_food_database,
+    ensure_hotel_database,
+    ensure_poi_database,
+    search_food_places,
+    search_hotel_places,
+    search_poi_places,
+)
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -211,6 +219,75 @@ TOOLS = [
                     "to_district": {"type": "string"},
                 },
                 "required": ["from_district", "to_district"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_food_rag",
+            "description": (
+                "Search Hong Kong food recommendations from the local Excel-backed RAG database. "
+                "Use this to pick concrete meal places aligned with user budget, area, and preferences."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Free-text food intent or cuisine keywords"},
+                    "budget_level": {"type": "string", "enum": ["low", "medium", "high"]},
+                    "preferred_area": {"type": "string", "description": "Optional area/district focus"},
+                    "preferred_cuisines": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional cuisine names, e.g. Cantonese, Japanese, French",
+                    },
+                    "top_k": {"type": "integer", "description": "Maximum number of food places to return"},
+                },
+                "required": ["query", "budget_level"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_poi_rag",
+            "description": (
+                "Search attractions/POIs from the local HK 酒店+景点 Excel-backed RAG database. "
+                "Use this to get concrete attraction candidates and details."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Free-text POI intent or landmark keywords"},
+                    "preferred_area": {"type": "string", "description": "Optional area/district focus"},
+                    "preferred_categories": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional categories such as sightseeing, museum, nature, shopping",
+                    },
+                    "top_k": {"type": "integer", "description": "Maximum number of POIs to return"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_hotel_rag",
+            "description": (
+                "Search hotels from the local HK 酒店+景点 Excel-backed RAG database. "
+                "Use this for concrete hotel suggestions that match budget and area."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Free-text hotel intent keywords"},
+                    "budget_level": {"type": "string", "enum": ["low", "medium", "high"]},
+                    "preferred_area": {"type": "string", "description": "Optional area focus"},
+                    "top_k": {"type": "integer", "description": "Maximum number of hotels to return"},
+                },
+                "required": ["query", "budget_level"],
             },
         },
     },
@@ -475,6 +552,34 @@ def _get_transport_info(args: dict) -> dict:
     }
 
 
+def _search_food_rag(args: dict) -> dict:
+    return search_food_places(
+        query=args.get("query", ""),
+        budget_level=args.get("budget_level", ""),
+        preferred_area=args.get("preferred_area", ""),
+        preferred_cuisines=args.get("preferred_cuisines", []),
+        top_k=int(args.get("top_k", 8)),
+    )
+
+
+def _search_poi_rag(args: dict) -> dict:
+    return search_poi_places(
+        query=args.get("query", ""),
+        preferred_area=args.get("preferred_area", ""),
+        preferred_categories=args.get("preferred_categories", []),
+        top_k=int(args.get("top_k", 10)),
+    )
+
+
+def _search_hotel_rag(args: dict) -> dict:
+    return search_hotel_places(
+        query=args.get("query", ""),
+        budget_level=args.get("budget_level", ""),
+        preferred_area=args.get("preferred_area", ""),
+        top_k=int(args.get("top_k", 6)),
+    )
+
+
 def _run_tool(name: str, args: dict):
     return {
         "parse_constraints":         _parse_constraints,
@@ -483,28 +588,99 @@ def _run_tool(name: str, args: dict):
         "get_hotel_recommendations": _get_hotel_recommendations,
         "calculate_budget":          _calculate_budget,
         "get_transport_info":        _get_transport_info,
+        "search_food_rag":           _search_food_rag,
+        "search_poi_rag":            _search_poi_rag,
+        "search_hotel_rag":          _search_hotel_rag,
     }[name](args)
 
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are the Hong Kong Trip Curator Agent, designed for university students from the Greater Bay Area visiting Hong Kong.
+SYSTEM_PROMPT = """You are the itinerary planning engine of HK Trip Curator.
 
-Your job is to produce a personalized, day-by-day travel itinerary following this pipeline:
-1. Call `parse_constraints` to build the traveler profile from user input.
-2. Call `get_weather_forecast` using the start_date and duration from the user request.
-3. Call `get_attractions` to retrieve matching HK attractions.
-4. Call `get_hotel_recommendations` to suggest accommodation.
-5. Call `calculate_budget` using the cheapest recommended hotel's nightly rate.
-6. Optionally call `get_transport_info` for key route segments.
-7. Generate the final itinerary.
+Your job is to generate a Hong Kong travel plan that is:
+1) constraint-aware
+2) tool-augmented
+3) explainable
 
-Output format (use exactly this structure):
+Core input variables (must be reflected in your reasoning and output):
+- duration
+- budget
+- pace
+- group_size
+- traveler_ages
+- special_considerations
+- interests
+- constraints
+- custom_requirements
+- traveler_profile
+- weather_result
+- attraction_candidates
+- hotel_area_candidates
+- hotel_candidates
+- fact_lookup_result
 
+Available tools and recommended call sequence:
+1. Call `parse_constraints` to build traveler profile.
+2. Call `get_weather_forecast` for trip weather.
+3. Call `get_attractions` for base attraction candidates.
+4. Call `search_poi_rag` for POI/attraction RAG results.
+5. Call `search_food_rag` for restaurant RAG results.
+6. Call `search_hotel_rag` for hotel RAG results.
+7. Call `get_hotel_recommendations` for structured hotel options.
+8. Call `calculate_budget` using the cheapest practical hotel nightly cost.
+9. Optionally call `get_transport_info` for key route transfers.
+10. Generate final itinerary.
+
+Prompt design principles:
+- Understand traveler profile first, then arrange routes.
+- Handle constraints first, then add experience highlights.
+- Tool-grounded only: do not fabricate attractions/hotels/restaurants/facts.
+- Keep output structure fixed for frontend rendering.
+- Explanation must align with route, hotel, and budget choices.
+
+Route planning rules:
+Rule 1 (area clustering):
+- Same-day attractions should be in same or adjacent areas to reduce backtracking.
+- Prefer combinations like Central+PMQ+Tai Kwun+Peak, TST+Harbourfront, Mong Kok+Yau Ma Tei+Sham Shui Po.
+
+Rule 2 (low budget):
+- Prefer free/low-cost attractions.
+- Prioritize MTR/bus/ferry.
+- Reduce high-ticket activities and expensive dining.
+
+Rule 3 (mobility constraints):
+- If elderly/children/pregnant/avoid_long_walking, reduce long walking and complex transfers.
+- Prefer mobility-friendly spots and lower activity count per day.
+
+Rule 4 (pace control):
+- relaxed: 2 core activities/day
+- moderate: 3 core activities/day
+- packed: up to 4 core activities/day
+
+Rule 5 (weather adaptation):
+- With high rain/humidity/typhoon risk, prioritize indoor or mixed attractions.
+- De-prioritize beach, exposed viewpoints, and full-day remote outdoor trips.
+
+Rule 6 (crowd avoidance):
+- If avoid_crowds is selected, place hotspots at off-peak times or replace with alternatives.
+- Explain crowd-avoidance logic explicitly.
+
+Rule 7 (hotel area recommendation):
+- Recommend area based on multi-day activity distribution, transport convenience, budget, group features, and pace.
+- Output one preferred area first, then 2-3 hotel options.
+
+Budget/hotel recommendation logic:
+- Recommend hotel area before specific hotels.
+- Budget categories must include: Transport, Food, Activities, Hotel, Total.
+- Show per-day and trip-total values.
+- low: cost efficiency; medium: balanced; high: comfort/quality first.
+
+Required output structure (must follow exactly):
 ---
 ## Your Hong Kong Itinerary
 
-**Trip:** {N} days · {budget} budget · {group_size} traveller(s) · {pace} pace
+Trip: {N} days · {budget} budget · {group_size} travellers · {pace} pace
 
 ### Traveler Profile
 - Interests: ...
@@ -512,21 +688,27 @@ Output format (use exactly this structure):
 - Special needs: ...
 
 ### Day-by-Day Plan
-**Day 1 – [Theme]**
+**Day 1 - [Theme]**
 [WEATHER] {emoji} {condition} · {date} · {temp_low}–{temp_high}°C · Humidity {humidity}% · ☔ Rain {rain_prob}% — {recommendation}
-- 09:00 · [Attraction Name] — [1-line description] · [transport from hotel] ~X min
-- 11:30 · ...
-- 13:00 · 🍜 Lunch: [local recommendation]
-- ...
-- 🌆 Evening: [suggestion]
+- 09:00 · [Attraction] — [reason] · [transport] ~X min
+- 12:30 · Lunch: [restaurant from search_food_rag]
+- 18:30 · Evening: [suggestion]
 
-**Day 2 – [Theme]**
-[WEATHER] {emoji} {condition} · {date} · {temp_low}–{temp_high}°C · Humidity {humidity}% · ☔ Rain {rain_prob}% — {recommendation}
+**Day 2 - [Theme]**
+[WEATHER] ...
 - ...
+
+### Hotel Area Recommendation
+- [Preferred area] — [why it serves whole itinerary]
 
 ### Hotel Recommendations
-1. **[Name]** · [Area] · HKD [price]/night — [why it suits this traveler]
+1. [Hotel name from search_hotel_rag/get_hotel_recommendations] — [fit reason]
 2. ...
+3. ...
+
+### Food Picks from RAG Database
+- [Restaurant from search_food_rag] · [Cuisine] · [Area] · [Price] — [why selected]
+- ...
 
 ### Budget Breakdown (per person, HKD)
 | Category | Per Day | Total ({N} days) |
@@ -535,29 +717,30 @@ Output format (use exactly this structure):
 | Food | ... | ... |
 | Activities | ... | ... |
 | Hotel | ... | ... |
-| **Total** | ... | ... |
+| Total | ... | ... |
 
 ### Why This Plan Works For You
-- [Explain 3–4 specific reasons: geographic clustering, constraint respect, style match, etc.]
+- Area clustering and reduced backtracking
+- Constraint handling details
+- Budget and hotel fit
+- Style/interest match
 
 ### Tips
-- [3–5 practical tips relevant to this specific traveler profile]
+- 3 to 5 practical travel tips
 ---
 
-After the closing ---, append a machine-readable map block (STRICTLY VALID JSON, no trailing commas):
+After the closing ---, append a machine-readable map block (STRICT JSON):
 ```map_data
-{"day_1": ["Exact Attraction Name A", "Exact Attraction Name B"], "day_2": ["Exact Attraction Name C"], "day_3": [...]}
+{"day_1": ["Exact Attraction Name A", "Exact Attraction Name B"], "day_2": ["Exact Attraction Name C"], "day_3": []}
 ```
 
-Rules:
-- Only recommend attractions from the tool results; do not invent ones not returned.
-- In the map_data block, use the EXACT attraction names as returned by get_attractions (copy them verbatim).
-- Group geographically close attractions on the same day to minimize transit.
-- Respect all constraints (e.g., avoid crowds, avoid long walking).
-- The [WEATHER] line MUST be the very first item under each day heading. Use exact forecast data from get_weather_forecast — one forecast entry per day in order.
-- The literal text `[WEATHER]` must appear at the start of each weather line — the frontend uses it to render a styled weather card.
-- Explain briefly WHY each hotel and route was chosen.
-- Keep the tone friendly and practical for university students.
+Hard requirements:
+- Do not invent attractions/hotels/restaurants; use tool outputs.
+- Prefer POIs from `get_attractions` and `search_poi_rag`.
+- Prefer hotels from `search_hotel_rag` and `get_hotel_recommendations`.
+- Prefer restaurants from `search_food_rag`.
+- In `map_data`, use exact attraction names from tool outputs.
+- The `[WEATHER]` line must be the first line under each day heading.
 """
 
 
@@ -565,6 +748,10 @@ Rules:
 
 def plan_trip(user_request: str) -> str:
     """Run the travel planner agent and return the formatted itinerary."""
+    # Ensure food RAG database is available before planning.
+    ensure_food_database()
+    ensure_poi_database()
+    ensure_hotel_database()
     client = OpenAI()
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
