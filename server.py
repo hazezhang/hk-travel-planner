@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from agent import plan_trip, _get_weather_forecast
 from data import HK_ATTRACTIONS
+import os
 
 app = Flask(__name__, static_folder="static")
 
@@ -63,4 +64,5 @@ def plan():
 
 
 if __name__ == "__main__":
-    app.run(debug=False, port=5000)
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(debug=False, host="0.0.0.0", port=port)

@@ -55,7 +55,6 @@
 
 ```bash
 pip install -r requirements.txt
-pip install flask
 ```
 
 ### 2) Configure environment
@@ -81,6 +80,24 @@ Open:
 ```bash
 python app.py
 ```
+
+## Deploy to Render (Free Tier)
+
+1. Push this repo to GitHub (already done).
+2. Go to [Render Dashboard](https://dashboard.render.com/) and create a **New Web Service**.
+3. Connect your GitHub repository.
+4. Use these settings:
+   - Runtime: `Python 3`
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `gunicorn server:app`
+5. Add environment variable:
+   - `OPENAI_API_KEY=your_api_key_here`
+6. Deploy and open your Render URL.
+
+Notes:
+- This repo includes a `Procfile` (`web: gunicorn server:app`) for cloud startup.
+- `server.py` already supports Render `PORT` and binds `0.0.0.0`.
+- Free tier may sleep when idle, so first request can be slower.
 
 ## API
 
